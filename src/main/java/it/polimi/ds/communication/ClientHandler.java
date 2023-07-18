@@ -1,4 +1,4 @@
-package it.polimi.ds.comunication;
+package it.polimi.ds.communication;
 
 import java.net.Socket;
 import java.util.UUID;

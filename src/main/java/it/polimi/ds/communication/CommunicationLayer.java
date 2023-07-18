@@ -1,8 +1,7 @@
-package it.polimi.ds.comunication;
+package it.polimi.ds.communication;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import it.polimi.ds.utils.RuntimeTypeAdapterFactory;
+import it.polimi.ds.utils.MessageGsonBuilder;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -18,7 +17,7 @@ public class CommunicationLayer {
     /**
      * Default communication port
      */
-    private static final int PORT = 4445;
+    private static final int DEFAULT_PORT = 4445;
     private static final int BROADCAST_INTERVAL = 10000;
 
 
@@ -35,12 +34,25 @@ public class CommunicationLayer {
     /**
      * Serializer of basic messages
      */
-    private static final Gson gson = new GsonBuilder().registerTypeAdapterFactory(RuntimeTypeAdapterFactory.of(
-                    BasicMessage.class, "type")
-            .registerSubtype(DataMessage.class, "data")
-            .registerSubtype(DiscoveryMessage.class, "discovery")).create();
+    private static final Gson gson = new MessageGsonBuilder().registerMessageAdapter()
+            .registerLocalDateTimeAdapter()
+            .create();
 
     private final Map<UUID, ClientHandler> connectedClients = new HashMap<>();
+
+    private final int port;
+
+    private CommunicationLayer(int port) {
+        this.port = port;
+    }
+
+    public static CommunicationLayer defaultConfiguration(){
+        return new CommunicationLayer(DEFAULT_PORT);
+    }
+
+    public static CommunicationLayer customConfiguration(int port){
+        return new CommunicationLayer(port);
+    }
 
     /**
      * Serialize and convert a message into bytes using UTF-8 encoding
@@ -73,11 +85,11 @@ public class CommunicationLayer {
             socket.setBroadcast(true);
 
             while (!isConnected) {
-                DiscoveryMessage message = new DiscoveryMessage(LocalDateTime.now(), uuid);
+                DiscoveryMessage message = new DiscoveryMessage(LocalDateTime.now(), uuid, port);
                 byte[] sendData = encodeMessage(message);
 
                 DatagramPacket packet = new DatagramPacket(sendData, sendData.length,
-                        InetAddress.getByName(BROADCAST_ADDR), PORT);
+                        InetAddress.getByName(BROADCAST_ADDR), port);
 
                 socket.send(packet);
                 System.out.println("Broadcast message sent: " + message);
@@ -90,8 +102,9 @@ public class CommunicationLayer {
     }
 
     private void startDiscoveryListener() {
-        try (DatagramSocket socket = new DatagramSocket(PORT)) {
-            byte[] receiveData = new byte[1024];
+        final int bufferSize = 1024;
+        try (DatagramSocket socket = new DatagramSocket(port)) {
+            byte[] receiveData = new byte[bufferSize];
 
             while (true) {
                 DatagramPacket packet = new DatagramPacket(receiveData, receiveData.length);
@@ -109,7 +122,7 @@ public class CommunicationLayer {
 
     private void addClient(DiscoveryMessage message, InetAddress address) {
         try {
-            ClientHandler clientHandler = new ClientHandler(message.getSenderUID(), new Socket(address, PORT), this);
+            ClientHandler clientHandler = new ClientHandler(message.getSenderUID(), new Socket(address, message.getPort()), this);
             connectedClients.put(message.getSenderUID(), clientHandler);
             new Thread(clientHandler).start();
         } catch (IOException e) {
