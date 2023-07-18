@@ -10,6 +10,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.*;
 
 public class CommunicationLayer {
@@ -56,11 +57,34 @@ public class CommunicationLayer {
     }
 
     private void init() {
-        Thread discoveryListener = new Thread(this::startDiscoveryListener);
-        discoveryListener.start();
+        new Thread(this::startDiscoveryListener).start();
+        Thread discoverySender = new Thread(this::startDiscoverySender);
+        discoverySender.start();
         try {
-            discoveryListener.join();
+            discoverySender.join();
         } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    private void startDiscoverySender() {
+        try (DatagramSocket socket = new DatagramSocket()) {
+            socket.setBroadcast(true);
+
+            while (!isConnected) {
+                DiscoveryMessage message = new DiscoveryMessage(LocalDateTime.now(), uuid);
+                byte[] sendData = encodeMessage(message);
+
+                DatagramPacket packet = new DatagramPacket(sendData, sendData.length,
+                        InetAddress.getByName(BROADCAST_ADDR), PORT);
+
+                socket.send(packet);
+                System.out.println("Broadcast message sent: " + message);
+
+                Thread.sleep(BROADCAST_INTERVAL);
+            }
+        } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
         }
     }
