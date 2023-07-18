@@ -1,4 +1,4 @@
-package it.polimi.ds.comunication;
+package it.polimi.ds.communication;
 
 public enum MessageType {
     DATA("DataMessage"),

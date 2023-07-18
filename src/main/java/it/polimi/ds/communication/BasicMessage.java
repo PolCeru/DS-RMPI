@@ -1,4 +1,4 @@
-package it.polimi.ds.comunication;
+package it.polimi.ds.communication;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -30,8 +30,6 @@ public abstract class BasicMessage {
     private static boolean compareDate(LocalDateTime t1, LocalDateTime t2) {
         return t1.getDayOfYear() == t2.getDayOfYear() && t1.getYear() == t2.getYear() && t1.getSecond() == t2.getSecond() && t1.getMinute() == t2.getMinute() && t1.getHour() == t2.getHour();
     }
-
-    ;
 
     @Override
     public boolean equals(Object o) {

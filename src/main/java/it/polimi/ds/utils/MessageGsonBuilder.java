@@ -2,13 +2,13 @@ package it.polimi.ds.utils;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import it.polimi.ds.comunication.BasicMessage;
-import it.polimi.ds.comunication.MessageType;
+import it.polimi.ds.communication.BasicMessage;
+import it.polimi.ds.communication.MessageType;
 
 import java.time.LocalDateTime;
 
 public class MessageGsonBuilder {
-    private final static String messagePackage = "it.polimi.ds.comunication.";
+    private final static String messagePackage = "it.polimi.ds.communication.";
     private final static String messageField = "messageType";
 
     private final GsonBuilder gsonBuilder = new GsonBuilder();
@@ -19,6 +19,7 @@ public class MessageGsonBuilder {
 
         for (MessageType type : MessageType.values()) {
             try {
+                //noinspection unchecked
                 messageRuntimeTypeAdapterFactory.registerSubtype((Class<? extends BasicMessage>) Class.forName(
                         messagePackage + type.getClassName()), type.name());
             } catch (ClassNotFoundException e) {
