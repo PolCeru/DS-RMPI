@@ -1,6 +1,7 @@
 package it.polimi.ds.comunication;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.UUID;
 
 public abstract class BasicMessage {
@@ -24,5 +25,25 @@ public abstract class BasicMessage {
 
     public LocalDateTime getTimestamp() {
         return timestamp;
+    }
+
+    private static boolean compareDate(LocalDateTime t1, LocalDateTime t2) {
+        return t1.getDayOfYear() == t2.getDayOfYear() && t1.getYear() == t2.getYear() && t1.getSecond() == t2.getSecond() && t1.getMinute() == t2.getMinute() && t1.getHour() == t2.getHour();
+    }
+
+    ;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        BasicMessage that = (BasicMessage) o;
+        return compareDate(this.timestamp, that.timestamp) && Objects.equals(senderUID,
+                that.senderUID) && messageType == that.messageType;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(timestamp, senderUID, messageType);
     }
 }
