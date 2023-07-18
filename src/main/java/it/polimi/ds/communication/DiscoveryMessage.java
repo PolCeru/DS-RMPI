@@ -4,7 +4,15 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 public class DiscoveryMessage extends BasicMessage {
-    protected DiscoveryMessage(LocalDateTime timestamp, UUID senderUID) {
+
+    final int port;
+
+    protected DiscoveryMessage(LocalDateTime timestamp, UUID senderUID, int port) {
         super(timestamp, senderUID, MessageType.DISCOVERY);
+        this.port = port;
+    }
+
+    public int getPort() {
+        return port;
     }
 }
