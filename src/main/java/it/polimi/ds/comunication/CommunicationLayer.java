@@ -165,6 +165,10 @@ public class CommunicationLayer {
         }
     }
 
+    public void disconnectClient(UUID clientID){
+        //TODO: implement
+    }
+
     public boolean isConnected() {
         return isConnected;
     }
