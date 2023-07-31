@@ -1,6 +1,7 @@
 package it.polimi.ds.communication;
 
 import com.google.gson.Gson;
+import it.polimi.ds.reliability.ReliabilityMessage;
 import it.polimi.ds.utils.MessageGsonBuilder;
 
 import java.io.IOException;
@@ -9,6 +10,8 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * Base layer of the protocol stack, allows to create a broadcast network of devices using a mesh topology of
@@ -55,7 +58,7 @@ public class CommunicationLayer {
     /**
      * Serializer of basic messages
      */
-    private static final Gson gson = new MessageGsonBuilder().registerMessageAdapter()
+    static final Gson gson = new MessageGsonBuilder().registerMessageAdapter()
             .registerLocalDateTimeAdapter()
             .create();
 
@@ -63,6 +66,11 @@ public class CommunicationLayer {
      * List of all connected clients
      */
     private final Map<UUID, ClientHandler> connectedClients = new HashMap<>();
+
+    /**
+     * Buffer of messages to be sent to the upper Reliability layer
+     */
+    private final BlockingQueue<BasicMessage> upBuffer = new LinkedBlockingQueue<>();
 
     /**
      * Port used for communication
@@ -227,4 +235,56 @@ public class CommunicationLayer {
         System.out.println("Successfully connected with device " + socket.getInetAddress().getHostAddress());
     }
 
+    /**
+     * Send a message to a specific client, used to send an ACK message after a DATA message or to resend a DATA message
+     * to a specific client.
+     * @param clientID the client to which the message is sent
+     * @param message the message to be sent
+     */
+    public void sendMessage(UUID clientID, ReliabilityMessage message) {
+        ClientHandler clientHandler = connectedClients.get(clientID);
+        if (clientHandler != null) {
+            clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(), clientID, MessageType.DATA, message)));
+        }
+    }
+
+    /**
+     * Send a message to all connected clients simultaneously, simulating a broadcast
+     *
+     * @param message the message to be sent
+     */
+    public void sendMessageBroadcast(ReliabilityMessage message) {
+        for (ClientHandler clientHandler : connectedClients.values()) {
+            clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(), clientHandler.getClientID(), MessageType.DATA, message)));
+        }
+    }
+
+    /**
+     * Return the next message in the buffer, blocking if the buffer is empty
+     *
+     * @return the next message in the buffer
+     */
+    public BasicMessage getMessage(){
+        try {
+            return upBuffer.take();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void disconnectClient(UUID clientID){
+        //TODO: implement
+    }
+
+    public boolean isConnected() {
+        return isConnected;
+    }
+
+    public Map<UUID, ClientHandler> getConnectedClients() {
+        return connectedClients;
+    }
+
+    public BlockingQueue<BasicMessage> getUpBuffer() {
+        return upBuffer;
+    }
 }
