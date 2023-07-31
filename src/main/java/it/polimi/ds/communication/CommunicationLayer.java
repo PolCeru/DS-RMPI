@@ -4,10 +4,8 @@ import com.google.gson.Gson;
 import it.polimi.ds.utils.MessageGsonBuilder;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.Socket;
+import java.io.InputStream;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -25,6 +23,8 @@ public class CommunicationLayer {
      * Identify this machine uniquely
      */
     private final UUID uuid = UUID.randomUUID();
+
+    private final int random = new Random().nextInt();
 
     /**
      * Show if this piece is still locking for a device networks
@@ -44,13 +44,14 @@ public class CommunicationLayer {
 
     private CommunicationLayer(int port) {
         this.port = port;
+        init();
     }
 
-    public static CommunicationLayer defaultConfiguration(){
+    public static CommunicationLayer defaultConfiguration() {
         return new CommunicationLayer(DEFAULT_PORT);
     }
 
-    public static CommunicationLayer customConfiguration(int port){
+    public static CommunicationLayer customConfiguration(int port) {
         return new CommunicationLayer(port);
     }
 
@@ -64,13 +65,14 @@ public class CommunicationLayer {
         return gson.toJson(message).getBytes(StandardCharsets.UTF_8);
     }
 
-    private static BasicMessage decodeMessage(byte[] payload) {
-        return gson.fromJson(new String(payload, StandardCharsets.UTF_8), BasicMessage.class);
+    private static BasicMessage decodeMessage(byte[] payload, int length) {
+        return gson.fromJson(new String(payload, 0, length, StandardCharsets.UTF_8), DiscoveryMessage.class);
     }
 
-    private void init() {
-        new Thread(this::startDiscoveryListener).start();
-        Thread discoverySender = new Thread(this::startDiscoverySender);
+    protected void init() {
+        new Thread(this::startDiscoveryListener, "Discovery Listener").start();
+        new Thread(this::startServerListener, "Server Listener").start();
+        Thread discoverySender = new Thread(this::startDiscoverySender, "Discovery sender");
         discoverySender.start();
         try {
             discoverySender.join();
@@ -85,7 +87,7 @@ public class CommunicationLayer {
             socket.setBroadcast(true);
 
             while (!isConnected) {
-                DiscoveryMessage message = new DiscoveryMessage(LocalDateTime.now(), uuid, port);
+                DiscoveryMessage message = new DiscoveryMessage(LocalDateTime.now(), uuid, port, random);
                 byte[] sendData = encodeMessage(message);
 
                 DatagramPacket packet = new DatagramPacket(sendData, sendData.length,
@@ -101,33 +103,62 @@ public class CommunicationLayer {
         }
     }
 
-    private void startDiscoveryListener() {
-        final int bufferSize = 1024;
-        try (DatagramSocket socket = new DatagramSocket(port)) {
-            byte[] receiveData = new byte[bufferSize];
-
+    private void startServerListener() {
+        InputStream inputStream;
+        byte[] buffer;
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
             while (true) {
-                DatagramPacket packet = new DatagramPacket(receiveData, receiveData.length);
-                socket.receive(packet);
-
-                DiscoveryMessage message = (DiscoveryMessage) decodeMessage(packet.getData());
-                InetAddress address = packet.getAddress();
-                addClient(message, address);
-                isConnected = true;
+                Socket socket = serverSocket.accept();
+                inputStream = socket.getInputStream();
+                buffer = inputStream.readNBytes(1024);
+                DiscoveryMessage message = (DiscoveryMessage) decodeMessage(buffer, buffer.length);
+                System.out.println("Received connection message from " + socket.getInetAddress()
+                        .getHostAddress() + " - " + message.getRandom());
+                if (message.random <= this.random) {
+                    addClient(message.getSenderUID(), socket);
+                } else
+                    System.err.println(
+                            "My random is " + this.random + " but i received a message from " + socket.getInetAddress()
+                                    .getHostAddress() + " with random " + message.random);
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private void addClient(DiscoveryMessage message, InetAddress address) {
-        try {
-            ClientHandler clientHandler = new ClientHandler(message.getSenderUID(), new Socket(address, message.getPort()), this);
-            connectedClients.put(message.getSenderUID(), clientHandler);
-            new Thread(clientHandler).start();
+    private void startDiscoveryListener() {
+        final int bufferSize = 1024;
+        try (DatagramSocket datagramSocket = new DatagramSocket(port)) {
+            byte[] receiveData = new byte[bufferSize];
+
+            while (true) {
+                DatagramPacket packet = new DatagramPacket(receiveData, receiveData.length);
+                datagramSocket.receive(packet);
+
+                DiscoveryMessage message = (DiscoveryMessage) decodeMessage(packet.getData(), packet.getLength());
+                if (message.random > this.random) {
+                    InetAddress address = packet.getAddress();
+                    try (Socket socket = new Socket(address, port)) {
+                        socket.getOutputStream()
+                                .write(encodeMessage(new DiscoveryMessage(LocalDateTime.now(), uuid, port, random)));
+                        addClient(message.getSenderUID(), socket);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    synchronized private void addClient(UUID senderUID, Socket socket) {
+        ClientHandler clientHandler = new ClientHandler(senderUID,
+                socket, this);
+        connectedClients.put(senderUID, clientHandler);
+        new Thread(clientHandler).start();
+        if (!isConnected) isConnected = !isConnected;
+        System.out.println("Successfully connected with device " + socket.getInetAddress().getHostAddress());
     }
 
 }

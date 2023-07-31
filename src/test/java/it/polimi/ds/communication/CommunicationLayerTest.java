@@ -1,5 +1,7 @@
 package it.polimi.ds.communication;
 
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -13,8 +15,12 @@ import java.util.UUID;
 
 class CommunicationLayerTest {
 
-    @Test
-    void discoveryMessageSerialization() {
+    @Nested
+    @DisplayName("Test BasicMessage (de)serialization and equivalency")
+    class SerializationTests{
+
+        @Test
+        void discoveryMessageSerialization () {
         LocalDateTime time = LocalDateTime.now();
         UUID uuid = UUID.randomUUID();
         DiscoveryMessage message = new DiscoveryMessage(time, uuid, 4445);
@@ -29,8 +35,8 @@ class CommunicationLayerTest {
             throw new RuntimeException(e);
         }
     }
-    @Test
-    void discoveryMessageDeserialization() {
+        @Test
+        void discoveryMessageDeserialization () {
         LocalDateTime time = LocalDateTime.now();
         UUID uuid = UUID.randomUUID();
         DiscoveryMessage message = new DiscoveryMessage(time, uuid, 4445);
@@ -46,5 +52,6 @@ class CommunicationLayerTest {
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
+    }
     }
 }
