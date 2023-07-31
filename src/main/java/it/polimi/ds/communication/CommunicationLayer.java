@@ -149,7 +149,7 @@ public class CommunicationLayer {
                 socket.send(packet);
                 System.out.println("Broadcast message sent: " + message);
 
-                Thread.sleep(BROADCAST_INTERVAL);
+                Thread.sleep(broadcastInterval);
             }
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
