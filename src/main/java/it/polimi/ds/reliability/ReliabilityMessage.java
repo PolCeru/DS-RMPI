@@ -10,15 +10,33 @@ public class ReliabilityMessage {
 
     private final UUID messageID;
 
+    private final UUID referenceMessageID;
+
     private final MessageType messageType;
 
-    public ReliabilityMessage(UUID messageID, MessageType messageType, VSyncMessage payload) {
+    protected ReliabilityMessage(UUID messageID, VSyncMessage payload) {
         this.messageID = messageID;
-        this.messageType = messageType;
+        this.messageType = MessageType.DATA;
         this.payload = payload;
+        this.referenceMessageID = messageID;
+    }
+
+    protected ReliabilityMessage(UUID messageID, UUID referenceMessageID) {
+        this.messageID = messageID;
+        this.messageType = MessageType.ACK;
+        this.payload = null;
+        this.referenceMessageID = referenceMessageID;
     }
 
     public MessageType getMessageType() {
         return messageType;
+    }
+
+    public UUID getReferenceMessageID() {
+        return referenceMessageID;
+    }
+
+    public UUID getMessageID() {
+        return messageID;
     }
 }

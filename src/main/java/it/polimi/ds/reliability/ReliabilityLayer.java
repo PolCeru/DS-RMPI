@@ -4,6 +4,7 @@ import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.DataMessage;
 import it.polimi.ds.communication.MessageType;
 import it.polimi.ds.vsync.VSyncMessage;
+import it.polimi.ds.vsync.VSynchLayer;
 
 import java.util.HashMap;
 import java.util.Timer;
@@ -46,30 +47,44 @@ public class ReliabilityLayer {
 
     public ReliabilityLayer(CommunicationLayer handler) {
         this.handler = handler;
+        new VSynchLayer(this);
         new Thread(this::readMessage).start();
     }
 
-    /**
-     * Stays in a loop waiting for messages to be received from the lower Communication layer and
-     */
     private void readMessage() {
         while (handler.isConnected()) {
             DataMessage dataMessage = (DataMessage) handler.getMessage();
-            ReliabilityMessage message = dataMessage.getPayload();
             UUID senderUID = dataMessage.getSenderUID();
+            ReliabilityMessage messageReceived = dataMessage.getPayload();
 
-            if (ackMap.containsKey(message)) {
-                HashMap<UUID, Boolean> singleAck = new HashMap<>();
-                for (UUID uuid : handler.getConnectedClients().keySet())
-                    singleAck.put(uuid, false);
-                ackMap.put(message, singleAck);
-            } else if (message.getMessageType() == MessageType.ACK && !ackMap.get(message).get(senderUID)) {
-                ackMap.get(message).put(senderUID, true);
+            if (messageReceived.getMessageType() == MessageType.ACK){
+                //gets the referencedMessage, which is the message that matches message.getReferenceMessageID()
+                //TODO: if exception is thrown it means that an ack has been received for a non-existing message |*|
+                // --> client is "hacked" -> disconnect?
+                // |*| since the message is not in the ackMap --> question: can I still receive an ack for a message
+                // that has been removed from the ackMap because it has been acknowledged by all clients?
+                ReliabilityMessage referencedMessage = ackMap.entrySet().stream()
+                        .filter(entry -> entry.getKey().getMessageID().equals(messageReceived.getReferenceMessageID()))
+                        .findFirst()
+                        .orElseThrow()
+                        .getKey();
+                //and sets the ack flag to true
+                ackMap.get(referencedMessage).put(senderUID, true);
+
+                //if all clients have acknowledged the message, remove it from the ackMap
+                if (ackMap.get(messageReceived).values().stream().allMatch(b -> b)) {
+                    ackMap.remove(messageReceived);
+                    upBuffer.add(messageReceived);
+                }
             }
-
-            if (ackMap.get(message).values().stream().allMatch(b -> b)) {
-                ackMap.remove(message);
-                upBuffer.add(message);
+            //TODO: handle logic if an ack arrives while ackMap is already true -> Error
+            // if(ackMap.get(referencedMessage).get(senderUID))
+            else if (messageReceived.getMessageType() == MessageType.DATA) {
+                ReliabilityMessage ackMessage = new ReliabilityMessage(UUID.randomUUID(), messageReceived.getMessageID());
+                //TODO: downBuffer is useless?
+                // to review, written in a hurry.
+                downBuffer.add(ackMessage);
+                handler.sendMessage(senderUID, ackMessage);
             }
         }
     }
@@ -79,34 +94,39 @@ public class ReliabilityLayer {
      * Waits for the acks to be received and resends the message if necessary.
      * If the message is not acknowledged after MAX_RETRIES the client is considered disconnected
      * and the communication layer is notified.
-     *
      */
     private void sendMessageBroadcast() {
         Timer timer = new Timer();
         try {
             ReliabilityMessage message = downBuffer.take();
+            HashMap<UUID, Boolean> singleAck = new HashMap<>();
+            int TIMEOUT_RESEND = 10000;
+
             handler.sendMessageBroadcast(message);
-            /**
-             * Timeout in milliseconds for the acks to be received
-             */
-            int TIMEOUT = 10000;
+
+            //Init ack map for this message
+            for (UUID uuid : handler.getConnectedClients().keySet()) singleAck.put(uuid, false);
+            ackMap.put(message, singleAck);
+
             timer.scheduleAtFixedRate(new TimerTask() {
                 @Override
                 public void run() {
-                    ackMap.get(message).forEach((UUID, ackFlag) -> {
-                        if (!ackFlag)
-                            if(!retries.containsKey(message)){
-                                retries.put(message, 1);
-                                handler.sendMessage(UUID, message);
-                            }
-                            else if (retries.get(message) <= MAX_RETRIES){
-                                retries.put(message, retries.get(message) + 1);
-                                handler.sendMessage(UUID, message);
-                            }
-                            else handler.disconnectClient(UUID);
-                    });
+                ackMap.get(message).forEach((UUID, ackFlag) -> {
+                    //If the message is not acknowledged
+                    //and is not in the retries map, add it and send it again
+                    //otherwise check if the number of retries is less than MAX_RETRIES
+                    //and send it again or disconnect the client
+                    if (!ackFlag)
+                        if (!retries.containsKey(message)) {
+                            retries.put(message, 1);
+                            handler.sendMessage(UUID, message);
+                        } else if (retries.get(message) <= MAX_RETRIES) {
+                            retries.put(message, retries.get(message) + 1);
+                            handler.sendMessage(UUID, message);
+                        } else handler.disconnectClient(UUID);
+                });
                 }
-            }, 0, TIMEOUT);
+            }, 0, TIMEOUT_RESEND);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -114,12 +134,14 @@ public class ReliabilityLayer {
 
     /**
      * Gets a message from the upper VSynch layer, wraps it in a ReliabilityMessage and adds it to the downBuffer
+     *
      * @param message the message to be sent
      */
     private void sendMessage(VSyncMessage message) {
-        //called by VSynchLayer, converts to reliabilityMessage adds the message to the downBuffer and calls sendMessageBroadcast
+        //called by VSynchLayer, converts to reliabilityMessage adds the message to the downBuffer and calls
+        // sendMessageBroadcast
         //is downBuffer useful at all at this point? can we just send the message directly?
-        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), MessageType.DATA, message);
+        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message);
         downBuffer.add(messageToSend);
         sendMessageBroadcast();
     }
