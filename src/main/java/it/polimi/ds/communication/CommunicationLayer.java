@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import it.polimi.ds.communication.message.BasicMessage;
 import it.polimi.ds.communication.message.DataMessage;
 import it.polimi.ds.communication.message.DiscoveryMessage;
-import it.polimi.ds.communication.message.MessageType;
 import it.polimi.ds.reliability.ReliabilityMessage;
 import it.polimi.ds.utils.MessageGsonBuilder;
 import it.polimi.ds.vsync.view.ViewManager;
@@ -149,7 +148,7 @@ public class CommunicationLayer {
      * Deserialize and convert a message from bytes, assuming {@code UTF-8} encoding
      **/
     private static BasicMessage decodeMessage(byte[] payload, int length) {
-        return gson.fromJson(new String(payload, 0, length, StandardCharsets.UTF_8), DiscoveryMessage.class);
+        return gson.fromJson(new String(payload, 0, length, StandardCharsets.UTF_8), BasicMessage.class);
     }
 
     /**
@@ -250,7 +249,7 @@ public class CommunicationLayer {
     synchronized public void sendMessage(UUID clientID, ReliabilityMessage message) {
         ClientHandler clientHandler = connectedClients.get(clientID);
         if (clientHandler != null) {
-            clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(), clientID, MessageType.DATA, message)));
+            clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(), clientID, message)));
         }
     }
 
@@ -261,7 +260,7 @@ public class CommunicationLayer {
      */
     synchronized public void sendMessageBroadcast(ReliabilityMessage message) {
         for (ClientHandler clientHandler : connectedClients.values()) {
-            clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(), clientHandler.getClientID(), MessageType.DATA, message)));
+            clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(), clientHandler.getClientID(), message)));
         }
     }
 

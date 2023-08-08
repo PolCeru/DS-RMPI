@@ -12,8 +12,8 @@ public class DataMessage extends BasicMessage {
      */
     private final ReliabilityMessage payload;
 
-    public DataMessage(LocalDateTime timestamp, UUID senderUID, MessageType messageType, ReliabilityMessage payload) {
-        super(timestamp, senderUID, messageType);
+    public DataMessage(LocalDateTime timestamp, UUID senderUID, ReliabilityMessage payload) {
+        super(timestamp, senderUID, MessageType.DATA);
         this.payload = payload;
     }
 
