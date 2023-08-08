@@ -4,8 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import it.polimi.ds.communication.message.BasicMessage;
 import it.polimi.ds.communication.message.MessageType;
-//import it.polimi.ds.vsync.view.message.ViewChangeType;
-//import it.polimi.ds.vsync.view.message.ViewManagerMessage;
+import it.polimi.ds.vsync.view.message.ViewChangeType;
+import it.polimi.ds.vsync.view.message.ViewManagerMessage;
 
 import java.time.LocalDateTime;
 
@@ -43,7 +43,7 @@ public class MessageGsonBuilder {
         return gsonBuilder.serializeNulls().create();
     }
 
-    /*public MessageGsonBuilder registerViewMessageAdapter() {
+    public MessageGsonBuilder registerViewMessageAdapter() {
         RuntimeTypeAdapterFactory<ViewManagerMessage> messageRuntimeTypeAdapterFactory =
                 RuntimeTypeAdapterFactory.of(ViewManagerMessage.class, messageField, true);
 
@@ -60,5 +60,5 @@ public class MessageGsonBuilder {
         }
         gsonBuilder.registerTypeAdapterFactory(messageRuntimeTypeAdapterFactory);
         return this;
-    }*/
+    }
 }
