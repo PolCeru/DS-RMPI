@@ -9,7 +9,10 @@ import java.io.InputStream;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -223,7 +226,8 @@ public class CommunicationLayer {
     }
 
     /**
-     * Create a client handler for the corresponding real device (identified by the senderUID) and start the main thread of the client handler
+     * Create a client handler for the corresponding real device (identified by the senderUID) and start the main
+     * thread of the client handler
      * @param senderUID the senderUID of the device to connect to
      * @param socket the socket used to communicate with the device
      */

@@ -2,7 +2,6 @@ package it.polimi.ds.communication;
 
 public enum MessageType {
     DATA("DataMessage"),
-    ACK("AckMessage"),
     DISCOVERY("DiscoveryMessage");
 
     private final String className;

@@ -2,7 +2,6 @@ package it.polimi.ds.reliability;
 
 import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.DataMessage;
-import it.polimi.ds.communication.MessageType;
 import it.polimi.ds.vsync.VSyncMessage;
 import it.polimi.ds.vsync.VSynchLayer;
 
@@ -62,7 +61,8 @@ public class ReliabilityLayer {
                 //TODO: if exception is thrown it means that an ack has been received for a non-existing message |*|
                 // --> client is "hacked" -> disconnect?
                 // |*| since the message is not in the ackMap --> question: can I still receive an ack for a message
-                // that has been removed from the ackMap because it has been acknowledged by all clients?
+                // that has been removed from the ackMap because it has been acknowledged by all clients? answer:
+                // yes, just discard the ack
                 ReliabilityMessage referencedMessage = ackMap.entrySet().stream()
                         .filter(entry -> entry.getKey().getMessageID().equals(messageReceived.getReferenceMessageID()))
                         .findFirst()
@@ -77,13 +77,10 @@ public class ReliabilityLayer {
                     upBuffer.add(messageReceived);
                 }
             }
-            //TODO: handle logic if an ack arrives while ackMap is already true -> Error
+            //TODO: handle logic if an ack arrives while ackMap is already true -> discard the ack
             // if(ackMap.get(referencedMessage).get(senderUID))
             else if (messageReceived.getMessageType() == MessageType.DATA) {
                 ReliabilityMessage ackMessage = new ReliabilityMessage(UUID.randomUUID(), messageReceived.getMessageID());
-                //TODO: downBuffer is useless?
-                // to review, written in a hurry.
-                downBuffer.add(ackMessage);
                 handler.sendMessage(senderUID, ackMessage);
             }
         }
@@ -103,11 +100,9 @@ public class ReliabilityLayer {
             int TIMEOUT_RESEND = 10000;
 
             handler.sendMessageBroadcast(message);
-
             //Init ack map for this message
             for (UUID uuid : handler.getConnectedClients().keySet()) singleAck.put(uuid, false);
             ackMap.put(message, singleAck);
-
             timer.scheduleAtFixedRate(new TimerTask() {
                 @Override
                 public void run() {
