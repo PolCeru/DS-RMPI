@@ -2,7 +2,6 @@ package it.polimi.ds.reliability;
 
 import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.DataMessage;
-import it.polimi.ds.communication.message.MessageType;
 import it.polimi.ds.vsync.VSyncMessage;
 import it.polimi.ds.vsync.VSynchLayer;
 

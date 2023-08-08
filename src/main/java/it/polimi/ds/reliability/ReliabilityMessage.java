@@ -1,6 +1,5 @@
 package it.polimi.ds.reliability;
 
-import it.polimi.ds.communication.message.MessageType;
 import it.polimi.ds.vsync.VSyncMessage;
 
 import java.util.UUID;
