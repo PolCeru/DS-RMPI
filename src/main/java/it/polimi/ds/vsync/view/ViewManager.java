@@ -1,7 +1,6 @@
 package it.polimi.ds.vsync.view;
 
 import it.polimi.ds.communication.CommunicationLayer;
-import it.polimi.ds.vsync.VSynchLayer;
 
 import java.net.InetAddress;
 import java.net.Socket;
@@ -10,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public class ViewManager extends VSynchLayer {
+public class ViewManager {
     private final CommunicationLayer communicationLayer;
     private boolean isConnected = false;
 
