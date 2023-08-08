@@ -5,7 +5,7 @@ import it.polimi.ds.vsync.VSyncMessage;
 import java.util.UUID;
 
 public class ReliabilityMessage {
-    private final VSyncMessage payload;
+    private final KnowledgeableMessage payload;
 
     private final UUID messageID;
 
@@ -13,7 +13,7 @@ public class ReliabilityMessage {
 
     private final MessageType messageType;
 
-    protected ReliabilityMessage(UUID messageID, VSyncMessage payload) {
+    public ReliabilityMessage(UUID messageID, KnowledgeableMessage payload) {
         this.messageID = messageID;
         this.messageType = MessageType.DATA;
         this.payload = payload;
