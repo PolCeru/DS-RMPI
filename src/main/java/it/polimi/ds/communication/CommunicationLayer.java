@@ -3,6 +3,7 @@ package it.polimi.ds.communication;
 import com.google.gson.Gson;
 import it.polimi.ds.reliability.ReliabilityMessage;
 import it.polimi.ds.utils.MessageGsonBuilder;
+import it.polimi.ds.vsync.view.ViewManager;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -55,6 +56,8 @@ public class CommunicationLayer {
      */
     private volatile boolean isConnected = false;
 
+    private final ViewManager viewManager;
+
     /**
      * Serializer of basic messages
      */
@@ -85,6 +88,7 @@ public class CommunicationLayer {
     private CommunicationLayer(int port, int broadcastInterval) {
         this.port = port;
         this.broadcastInterval = broadcastInterval;
+        this.viewManager = new ViewManager(this);
         init();
     }
 
@@ -179,12 +183,7 @@ public class CommunicationLayer {
                 DiscoveryMessage message = (DiscoveryMessage) decodeMessage(buffer, buffer.length);
                 System.out.println("Received connection message from " + socket.getInetAddress()
                         .getHostAddress() + " - " + message.getRandom());
-                //TODO fix the random check and disable it when already connected
-                if (message.random <= this.random) {
-                    addClient(message.getSenderUID(), socket);
-                } else System.err.println(
-                        "My random is " + this.random + " but i received a message from " + socket.getInetAddress()
-                                .getHostAddress() + " with random " + message.random);
+                viewManager.handleNewConnection(message.getSenderUID(), message.getRandom(), socket);
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -206,16 +205,7 @@ public class CommunicationLayer {
                 datagramSocket.receive(packet);
 
                 DiscoveryMessage message = (DiscoveryMessage) decodeMessage(packet.getData(), packet.getLength());
-                if (message.random > this.random) {
-                    InetAddress address = packet.getAddress();
-                    try (Socket socket = new Socket(address, port)) {
-                        socket.getOutputStream()
-                                .write(encodeMessage(new DiscoveryMessage(LocalDateTime.now(), uuid, port, random)));
-                        addClient(message.getSenderUID(), socket);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
+                viewManager.handleNewHost(message.getSenderUID(), message.getRandom(), packet.getAddress());
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -227,7 +217,7 @@ public class CommunicationLayer {
      * @param senderUID the senderUID of the device to connect to
      * @param socket the socket used to communicate with the device
      */
-    synchronized private void addClient(UUID senderUID, Socket socket) {
+    synchronized public void addClient(UUID senderUID, Socket socket) {
         ClientHandler clientHandler = new ClientHandler(senderUID, socket, this);
         connectedClients.put(senderUID, clientHandler);
         new Thread(clientHandler).start();
@@ -241,7 +231,7 @@ public class CommunicationLayer {
      * @param clientID the client to which the message is sent
      * @param message the message to be sent
      */
-    public void sendMessage(UUID clientID, ReliabilityMessage message) {
+    synchronized public void sendMessage(UUID clientID, ReliabilityMessage message) {
         ClientHandler clientHandler = connectedClients.get(clientID);
         if (clientHandler != null) {
             clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(), clientID, MessageType.DATA, message)));
@@ -253,9 +243,21 @@ public class CommunicationLayer {
      *
      * @param message the message to be sent
      */
-    public void sendMessageBroadcast(ReliabilityMessage message) {
+    synchronized public void sendMessageBroadcast(ReliabilityMessage message) {
         for (ClientHandler clientHandler : connectedClients.values()) {
             clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(), clientHandler.getClientID(), MessageType.DATA, message)));
+        }
+    }
+
+    synchronized public void initConnection(InetAddress address, int newRandom, UUID newUUID) {
+        if (newRandom > this.random) {
+            try (Socket socket = new Socket(address, port)) {
+                socket.getOutputStream()
+                        .write(encodeMessage(new DiscoveryMessage(LocalDateTime.now(), uuid, port, random)));
+                addClient(newUUID, socket);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
@@ -271,6 +273,8 @@ public class CommunicationLayer {
             throw new RuntimeException(e);
         }
     }
+
+    public int getRandom(){return random;}
 
     public void disconnectClient(UUID clientID){
         //TODO: implement
