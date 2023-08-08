@@ -1,6 +1,6 @@
 package it.polimi.ds.vsync.view.message;
 
-public class ViewManagerMessage {
+public abstract class ViewManagerMessage {
     private final ViewChangeType messageType;
 
     public ViewManagerMessage(ViewChangeType messageType) {
