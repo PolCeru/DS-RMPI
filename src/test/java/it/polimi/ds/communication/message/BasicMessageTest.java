@@ -1,8 +1,6 @@
 package it.polimi.ds.communication.message;
 
 import it.polimi.ds.communication.CommunicationLayer;
-import it.polimi.ds.communication.message.BasicMessage;
-import it.polimi.ds.communication.message.DiscoveryMessage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -16,7 +14,7 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 
 
-class CommunicationLayerTest {
+class BasicMessageTest {
 
     @Nested
     @DisplayName("Test BasicMessage (de)serialization and equivalency")
