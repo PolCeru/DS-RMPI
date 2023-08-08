@@ -26,6 +26,28 @@ import java.util.concurrent.LinkedBlockingQueue;
  */
 public class CommunicationLayer {
 
+    private final class DiscoverySender extends TimerTask {
+        private final DatagramSocket broadcastSocket;
+
+        private DiscoverySender(DatagramSocket socket) throws SocketException {
+            this.broadcastSocket = socket;
+            this.broadcastSocket.setBroadcast(true);
+        }
+
+        @Override
+        public void run() {
+            DiscoveryMessage message = new DiscoveryMessage(LocalDateTime.now(), uuid, port, random);
+            byte[] sendData = encodeMessage(message);
+            try {
+                DatagramPacket packet = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(BROADCAST_ADDR), port);
+                broadcastSocket.send(packet);
+                System.out.println("Broadcast message sent: " + message);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
     /**
      * Default broadcast address
      */
@@ -51,19 +73,19 @@ public class CommunicationLayer {
      */
     private final int random = new Random().nextInt();
 
+    private Timer timer;
+
+    private final ViewManager viewManager;
+
     /**
      * Show if this piece is still locking for a device networks
      */
     private volatile boolean isConnected = false;
 
-    private final ViewManager viewManager;
-
     /**
      * Serializer of basic messages
      */
-    static final Gson gson = new MessageGsonBuilder().registerMessageAdapter()
-            .registerLocalDateTimeAdapter()
-            .create();
+    static final Gson gson = new MessageGsonBuilder().registerMessageAdapter().registerLocalDateTimeAdapter().create();
 
     /**
      * List of all connected clients
@@ -127,45 +149,34 @@ public class CommunicationLayer {
     }
 
     /**
-     * Start the required thread to allow the discovery of other devices on the network and the listeners to allow
+     * Start the required threads to allow the discovery of other devices on the network and the listeners to allow
      * connections
      */
     protected void init() {
         new Thread(this::startDiscoveryListener, "Discovery Listener").start();
         new Thread(this::startServerListener, "Server Listener").start();
-        Thread discoverySender = new Thread(this::startDiscoverySender, "Discovery sender");
-        discoverySender.start();
-        try {
-            discoverySender.join();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-
+        startDiscoverySender();
     }
 
     /**
-     * Start a thread that send discovery messages periodically on the UDP broadcast network; the period is defined by
+     * Start a scheduled task that send discovery messages periodically on the UDP broadcast network; the period is defined by
      * the initial configuration of this protocol
      */
-    private void startDiscoverySender() {
+    public void startDiscoverySender() {
+        timer = new Timer();
         try (DatagramSocket socket = new DatagramSocket()) {
-            socket.setBroadcast(true);
-
-            while (!isConnected) {
-                DiscoveryMessage message = new DiscoveryMessage(LocalDateTime.now(), uuid, port, random);
-                byte[] sendData = encodeMessage(message);
-
-                DatagramPacket packet = new DatagramPacket(sendData, sendData.length,
-                        InetAddress.getByName(BROADCAST_ADDR), port);
-
-                socket.send(packet);
-                System.out.println("Broadcast message sent: " + message);
-
-                Thread.sleep(broadcastInterval);
-            }
-        } catch (InterruptedException | IOException e) {
+            timer.scheduleAtFixedRate(new DiscoverySender(socket), 0, broadcastInterval);
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Stop the task that send discovery messages
+     */
+    public void stopDiscoverySender() {
+        timer.cancel();
+        timer = null;
     }
 
     /**
@@ -181,8 +192,7 @@ public class CommunicationLayer {
                 inputStream = socket.getInputStream();
                 buffer = inputStream.readNBytes(1024);
                 DiscoveryMessage message = (DiscoveryMessage) decodeMessage(buffer, buffer.length);
-                System.out.println("Received connection message from " + socket.getInetAddress()
-                        .getHostAddress() + " - " + message.getRandom());
+                System.out.println("Received connection message from " + socket.getInetAddress().getHostAddress() + " - " + message.getRandom());
                 viewManager.handleNewConnection(message.getSenderUID(), message.getRandom(), socket);
             }
         } catch (IOException e) {
@@ -214,8 +224,9 @@ public class CommunicationLayer {
 
     /**
      * Create a client handler for the corresponding real device (identified by the senderUID) and start the main thread of the client handler
+     *
      * @param senderUID the senderUID of the device to connect to
-     * @param socket the socket used to communicate with the device
+     * @param socket    the socket used to communicate with the device
      */
     synchronized public void addClient(UUID senderUID, Socket socket) {
         ClientHandler clientHandler = new ClientHandler(senderUID, socket, this);
@@ -228,8 +239,9 @@ public class CommunicationLayer {
     /**
      * Send a message to a specific client, used to send an ACK message after a DATA message or to resend a DATA message
      * to a specific client.
+     *
      * @param clientID the client to which the message is sent
-     * @param message the message to be sent
+     * @param message  the message to be sent
      */
     synchronized public void sendMessage(UUID clientID, ReliabilityMessage message) {
         ClientHandler clientHandler = connectedClients.get(clientID);
@@ -252,8 +264,7 @@ public class CommunicationLayer {
     synchronized public void initConnection(InetAddress address, int newRandom, UUID newUUID) {
         if (newRandom > this.random) {
             try (Socket socket = new Socket(address, port)) {
-                socket.getOutputStream()
-                        .write(encodeMessage(new DiscoveryMessage(LocalDateTime.now(), uuid, port, random)));
+                socket.getOutputStream().write(encodeMessage(new DiscoveryMessage(LocalDateTime.now(), uuid, port, random)));
                 addClient(newUUID, socket);
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -266,7 +277,7 @@ public class CommunicationLayer {
      *
      * @return the next message in the buffer
      */
-    public BasicMessage getMessage(){
+    public BasicMessage getMessage() {
         try {
             return upBuffer.take();
         } catch (InterruptedException e) {
@@ -274,9 +285,11 @@ public class CommunicationLayer {
         }
     }
 
-    public int getRandom(){return random;}
+    public int getRandom() {
+        return random;
+    }
 
-    public void disconnectClient(UUID clientID){
+    public void disconnectClient(UUID clientID) {
         //TODO: implement
     }
 

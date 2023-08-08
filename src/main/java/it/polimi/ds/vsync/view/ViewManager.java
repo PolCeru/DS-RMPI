@@ -1,13 +1,10 @@
 package it.polimi.ds.vsync.view;
 
 import it.polimi.ds.communication.CommunicationLayer;
-import it.polimi.ds.communication.DiscoveryMessage;
 import it.polimi.ds.vsync.VSynchLayer;
 
-import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.time.LocalDateTime;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -19,7 +16,7 @@ public class ViewManager extends VSynchLayer {
 
     private Optional<UUID> realViewManager = Optional.empty();
 
-    private final List<UUID> list = new LinkedList<>();
+    private final List<UUID> connectedHosts = new LinkedList<>();
 
     public ViewManager(CommunicationLayer communicationLayer) {
         this.communicationLayer = communicationLayer;
@@ -27,11 +24,14 @@ public class ViewManager extends VSynchLayer {
 
     public synchronized void handleNewHost(UUID newHostId, int newHostRandom, InetAddress newHostAddress) {
         // already connected, so discard
-        if (list.contains(newHostId)) return;
+        if (connectedHosts.contains(newHostId)) return;
         // first connection between devices
         if (!isConnected) {
             if (communicationLayer.getRandom() < newHostRandom) {
                 communicationLayer.initConnection(newHostAddress, newHostRandom, newHostId);
+                communicationLayer.stopDiscoverySender();
+                connectedHosts.add(newHostId);
+                isConnected = true;
             } else {
                 System.out.println("DiscoveryMessage from " + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
             }
@@ -44,12 +44,15 @@ public class ViewManager extends VSynchLayer {
 
     public synchronized void handleNewConnection(UUID newHostId, int newHostRandom, Socket socket) {
         //already connected, so discard
-        if (list.contains(newHostId)) return;
+        if (connectedHosts.contains(newHostId)) return;
         // first connection between device
         if (!isConnected) {
             //check correct master
             if (communicationLayer.getRandom() >= newHostRandom) {
                 communicationLayer.addClient(newHostId, socket);
+                communicationLayer.stopDiscoverySender();
+                isConnected = true;
+                connectedHosts.add(newHostId);
             } else {
                 throw new RuntimeException("Wrong connection starting: my random " + communicationLayer.getRandom() + " vs " + newHostRandom);
             }
