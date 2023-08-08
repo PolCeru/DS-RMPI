@@ -1,4 +1,4 @@
-package it.polimi.ds.communication;
+package it.polimi.ds.communication.message;
 
 import java.time.LocalDateTime;
 import java.util.Random;
@@ -9,7 +9,7 @@ public class DiscoveryMessage extends BasicMessage {
     final int port;
     final int random;
 
-    protected DiscoveryMessage(LocalDateTime timestamp, UUID senderUID, int port, int random) {
+    public DiscoveryMessage(LocalDateTime timestamp, UUID senderUID, int port, int random) {
         super(timestamp, senderUID, MessageType.DISCOVERY);
         this.port = port;
         this.random = random;

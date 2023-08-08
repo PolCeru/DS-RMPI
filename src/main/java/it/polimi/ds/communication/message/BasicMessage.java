@@ -1,4 +1,4 @@
-package it.polimi.ds.communication;
+package it.polimi.ds.communication.message;
 
 import java.time.LocalDateTime;
 import java.util.Objects;

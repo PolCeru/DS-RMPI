@@ -1,6 +1,10 @@
 package it.polimi.ds.communication;
 
 import com.google.gson.Gson;
+import it.polimi.ds.communication.message.BasicMessage;
+import it.polimi.ds.communication.message.DataMessage;
+import it.polimi.ds.communication.message.DiscoveryMessage;
+import it.polimi.ds.communication.message.MessageType;
 import it.polimi.ds.reliability.ReliabilityMessage;
 import it.polimi.ds.utils.MessageGsonBuilder;
 import it.polimi.ds.vsync.view.ViewManager;
@@ -85,7 +89,7 @@ public class CommunicationLayer {
     /**
      * Serializer of basic messages
      */
-    static final Gson gson = new MessageGsonBuilder().registerMessageAdapter().registerLocalDateTimeAdapter().create();
+    static final Gson gson = new MessageGsonBuilder().registerBasicMessageAdapter().registerLocalDateTimeAdapter().create();
 
     /**
      * List of all connected clients

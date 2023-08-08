@@ -1,8 +1,8 @@
 package it.polimi.ds.reliability;
 
 import it.polimi.ds.communication.CommunicationLayer;
-import it.polimi.ds.communication.DataMessage;
-import it.polimi.ds.communication.MessageType;
+import it.polimi.ds.communication.message.DataMessage;
+import it.polimi.ds.communication.message.MessageType;
 import it.polimi.ds.vsync.VSyncMessage;
 
 import java.util.HashMap;

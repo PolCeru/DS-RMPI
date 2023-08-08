@@ -1,4 +1,4 @@
-package it.polimi.ds.communication;
+package it.polimi.ds.communication.message;
 
 import it.polimi.ds.reliability.ReliabilityMessage;
 
@@ -12,7 +12,7 @@ public class DataMessage extends BasicMessage {
      */
     private final ReliabilityMessage payload;
 
-    protected DataMessage(LocalDateTime timestamp, UUID senderUID, MessageType messageType, ReliabilityMessage payload) {
+    public DataMessage(LocalDateTime timestamp, UUID senderUID, MessageType messageType, ReliabilityMessage payload) {
         super(timestamp, senderUID, messageType);
         this.payload = payload;
     }

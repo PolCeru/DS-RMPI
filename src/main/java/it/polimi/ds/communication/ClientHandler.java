@@ -1,6 +1,8 @@
 package it.polimi.ds.communication;
 
 
+import it.polimi.ds.communication.message.DataMessage;
+
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;

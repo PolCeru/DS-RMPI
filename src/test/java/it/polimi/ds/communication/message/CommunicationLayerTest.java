@@ -1,5 +1,8 @@
-package it.polimi.ds.communication;
+package it.polimi.ds.communication.message;
 
+import it.polimi.ds.communication.CommunicationLayer;
+import it.polimi.ds.communication.message.BasicMessage;
+import it.polimi.ds.communication.message.DiscoveryMessage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -44,10 +47,10 @@ class CommunicationLayerTest {
             Method privateMethod = CommunicationLayer.class.getDeclaredMethod("encodeMessage", BasicMessage.class);
             privateMethod.setAccessible(true);
             byte[] bytes = (byte[]) privateMethod.invoke(CommunicationLayer.class, message);
-            Method privateMethod1 = CommunicationLayer.class.getDeclaredMethod("decodeMessage", byte[].class);
+            Method privateMethod1 = CommunicationLayer.class.getDeclaredMethod("decodeMessage", byte[].class, int.class);
             privateMethod1.setAccessible(true);
             DiscoveryMessage message1 = (DiscoveryMessage) privateMethod1.invoke(CommunicationLayer.class,
-                    (Object) bytes);
+                    (Object) bytes, bytes.length);
             assertEquals(message, message1);
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
