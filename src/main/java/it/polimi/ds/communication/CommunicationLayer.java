@@ -226,8 +226,8 @@ public class CommunicationLayer {
     }
 
     /**
-     * Create a client handler for the corresponding real device (identified by the senderUID) and start the main thread of the client handler
-     *
+     * Create a client handler for the corresponding real device (identified by the senderUID) and start the main
+     * thread of the client handler
      * @param senderUID the senderUID of the device to connect to
      * @param socket    the socket used to communicate with the device
      */
