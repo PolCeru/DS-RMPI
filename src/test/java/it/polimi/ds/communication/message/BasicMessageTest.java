@@ -1,14 +1,9 @@
 package it.polimi.ds.communication.message;
 
-import com.google.gson.Gson;
 import it.polimi.ds.communication.CommunicationLayer;
-import it.polimi.ds.reliability.ReliabilityMessage;
-import it.polimi.ds.utils.MessageGsonBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -16,6 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 
 class BasicMessageTest {
@@ -53,7 +50,7 @@ class BasicMessageTest {
                 Method privateMethod1 = CommunicationLayer.class.getDeclaredMethod("decodeMessage", byte[].class, int.class);
                 privateMethod1.setAccessible(true);
                 DiscoveryMessage message1 = (DiscoveryMessage) privateMethod1.invoke(CommunicationLayer.class,
-                        (Object) bytes, bytes.length);
+                        bytes, bytes.length);
                 assertEquals(message, message1);
             } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
                 throw new RuntimeException(e);
@@ -69,7 +66,7 @@ class BasicMessageTest {
                 Method privateMethod1 = CommunicationLayer.class.getDeclaredMethod("decodeMessage", byte[].class, int.class);
                 privateMethod1.setAccessible(true);
                 DataMessage deserializedMessage = (DataMessage) privateMethod1.invoke(CommunicationLayer.class,
-                        (Object) bytes, bytes.length);
+                        bytes, bytes.length);
                 assertEquals(initialMessage, deserializedMessage);
             } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
                 fail(e);
