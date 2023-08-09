@@ -34,10 +34,10 @@ public class CommunicationLayer {
      * Start a scheduled task that send discovery messages periodically on the UDP broadcast network; the period is defined by
      * the initial configuration of this protocol
      */
-    public void startDiscoverySender(int random) {
+    public void startDiscoverySender(UUID id, int random) {
         timer = new Timer();
         try {
-            timer.scheduleAtFixedRate(new DiscoverySender(random), 0, broadcastInterval);
+            timer.scheduleAtFixedRate(new DiscoverySender(id, random), 0, broadcastInterval);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -56,12 +56,6 @@ public class CommunicationLayer {
      * Default time interval between new discovery message is sent
      */
     private static final int BROADCAST_INTERVAL = 10000;
-
-
-    /**
-     * Identify this machine uniquely
-     */
-    private final UUID uuid = UUID.randomUUID();
 
     private Timer timer;
 
@@ -148,9 +142,9 @@ public class CommunicationLayer {
         new Thread(this::startServerListener, "Server Listener").start();
     }
 
-    synchronized public void initConnection(InetAddress address, int random, UUID newUUID) {
+    synchronized public void initConnection(InetAddress address, int random, UUID newUUID, BasicMessage message) {
         try (Socket socket = new Socket(address, port)) {
-            socket.getOutputStream().write(encodeMessage(new DiscoveryMessage(LocalDateTime.now(), uuid, port, random)));
+            socket.getOutputStream().write(encodeMessage(message));
             addClient(newUUID, socket);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -199,7 +193,6 @@ public class CommunicationLayer {
             while (true) {
                 DatagramPacket packet = new DatagramPacket(receiveData, receiveData.length);
                 datagramSocket.receive(packet);
-
                 DiscoveryMessage message = (DiscoveryMessage) decodeMessage(packet.getData(), packet.getLength());
                 viewManager.handleNewHost(message.getSenderUID(), message.getRandom(), packet.getAddress());
             }
@@ -252,15 +245,18 @@ public class CommunicationLayer {
         private final DatagramSocket broadcastSocket;
         private final int random;
 
-        private DiscoverySender(int random) throws SocketException {
+        private final UUID id;
+
+        private DiscoverySender(UUID id, int random) throws SocketException {
             this.broadcastSocket = new DatagramSocket();
             this.broadcastSocket.setBroadcast(true);
             this.random = random;
+            this.id = id;
         }
 
         @Override
         public void run() {
-            DiscoveryMessage message = new DiscoveryMessage(LocalDateTime.now(), uuid, port, random);
+            DiscoveryMessage message = new DiscoveryMessage(LocalDateTime.now(), id, random);
             byte[] sendData = encodeMessage(message);
             try {
                 DatagramPacket packet = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(BROADCAST_ADDR), port);

@@ -15,6 +15,11 @@ public class ViewManager {
      */
     private final int random = new Random().nextInt();
 
+    /**
+     * Identify this machine uniquely
+     */
+    private final UUID uuid = UUID.randomUUID();
+
     private final CommunicationLayer communicationLayer;
     private boolean isConnected = false;
 
@@ -64,6 +69,6 @@ public class ViewManager {
     }
 
     public void start() {
-        communicationLayer.startDiscoverySender(random);
+        communicationLayer.startDiscoverySender(uuid, random);
     }
 }
