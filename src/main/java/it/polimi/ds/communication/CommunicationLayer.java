@@ -30,25 +30,16 @@ import java.util.concurrent.LinkedBlockingQueue;
  */
 public class CommunicationLayer {
 
-    private final class DiscoverySender extends TimerTask {
-        private final DatagramSocket broadcastSocket;
-
-        private DiscoverySender(DatagramSocket socket) throws SocketException {
-            this.broadcastSocket = socket;
-            this.broadcastSocket.setBroadcast(true);
-        }
-
-        @Override
-        public void run() {
-            DiscoveryMessage message = new DiscoveryMessage(LocalDateTime.now(), uuid, port, random);
-            byte[] sendData = encodeMessage(message);
-            try {
-                DatagramPacket packet = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(BROADCAST_ADDR), port);
-                broadcastSocket.send(packet);
-                System.out.println("Broadcast message sent: " + message);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+    /**
+     * Start a scheduled task that send discovery messages periodically on the UDP broadcast network; the period is defined by
+     * the initial configuration of this protocol
+     */
+    public void startDiscoverySender(int random) {
+        timer = new Timer();
+        try (DatagramSocket socket = new DatagramSocket()) {
+            timer.scheduleAtFixedRate(new DiscoverySender(random, socket), 0, broadcastInterval);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -71,11 +62,6 @@ public class CommunicationLayer {
      * Identify this machine uniquely
      */
     private final UUID uuid = UUID.randomUUID();
-
-    /**
-     * Random number used by the protocol to decide which device is the master and should start the connection
-     */
-    private final int random = new Random().nextInt();
 
     private Timer timer;
 
@@ -160,17 +146,12 @@ public class CommunicationLayer {
     protected void init() {
         new Thread(this::startDiscoveryListener, "Discovery Listener").start();
         new Thread(this::startServerListener, "Server Listener").start();
-        startDiscoverySender();
     }
 
-    /**
-     * Start a scheduled task that send discovery messages periodically on the UDP broadcast network; the period is defined by
-     * the initial configuration of this protocol
-     */
-    public void startDiscoverySender() {
-        timer = new Timer();
-        try (DatagramSocket socket = new DatagramSocket()) {
-            timer.scheduleAtFixedRate(new DiscoverySender(socket), 0, broadcastInterval);
+    synchronized public void initConnection(InetAddress address, int random, UUID newUUID) {
+        try (Socket socket = new Socket(address, port)) {
+            socket.getOutputStream().write(encodeMessage(new DiscoveryMessage(LocalDateTime.now(), uuid, port, random)));
+            addClient(newUUID, socket);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -230,6 +211,7 @@ public class CommunicationLayer {
     /**
      * Create a client handler for the corresponding real device (identified by the senderUID) and start the main
      * thread of the client handler
+     *
      * @param senderUID the senderUID of the device to connect to
      * @param socket    the socket used to communicate with the device
      */
@@ -266,11 +248,24 @@ public class CommunicationLayer {
         }
     }
 
-    synchronized public void initConnection(InetAddress address, int newRandom, UUID newUUID) {
-        if (newRandom > this.random) {
-            try (Socket socket = new Socket(address, port)) {
-                socket.getOutputStream().write(encodeMessage(new DiscoveryMessage(LocalDateTime.now(), uuid, port, random)));
-                addClient(newUUID, socket);
+    private final class DiscoverySender extends TimerTask {
+        private final DatagramSocket broadcastSocket;
+        private final int random;
+
+        private DiscoverySender(int random, DatagramSocket socket) throws SocketException {
+            this.broadcastSocket = socket;
+            this.broadcastSocket.setBroadcast(true);
+            this.random = random;
+        }
+
+        @Override
+        public void run() {
+            DiscoveryMessage message = new DiscoveryMessage(LocalDateTime.now(), uuid, port, random);
+            byte[] sendData = encodeMessage(message);
+            try {
+                DatagramPacket packet = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(BROADCAST_ADDR), port);
+                broadcastSocket.send(packet);
+                System.out.println("Broadcast message sent: " + message);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -288,10 +283,6 @@ public class CommunicationLayer {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public int getRandom() {
-        return random;
     }
 
     public void disconnectClient(UUID clientID) {

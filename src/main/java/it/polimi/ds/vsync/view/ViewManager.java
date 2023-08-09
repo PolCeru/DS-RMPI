@@ -6,12 +6,15 @@ import it.polimi.ds.vsync.VSynchLayer;
 
 import java.net.InetAddress;
 import java.net.Socket;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 public class ViewManager {
+
+    /**
+     * Random number used by the protocol to decide which device is the master and should start the connection
+     */
+    private final int random = new Random().nextInt();
+
     private final CommunicationLayer communicationLayer;
     private boolean isConnected = false;
 
@@ -28,7 +31,7 @@ public class ViewManager {
         if (connectedHosts.contains(newHostId)) return;
         // first connection between devices
         if (!isConnected) {
-            if (communicationLayer.getRandom() < newHostRandom) {
+            if (random < newHostRandom) {
                 communicationLayer.initConnection(newHostAddress, newHostRandom, newHostId);
                 communicationLayer.stopDiscoverySender();
                 connectedHosts.add(newHostId);
@@ -49,14 +52,18 @@ public class ViewManager {
         // first connection between device
         if (!isConnected) {
             //check correct master
-            if (communicationLayer.getRandom() >= newHostRandom) {
+            if (random >= newHostRandom) {
                 communicationLayer.addClient(newHostId, socket);
                 communicationLayer.stopDiscoverySender();
                 isConnected = true;
                 connectedHosts.add(newHostId);
             } else {
-                throw new RuntimeException("Wrong connection starting: my random " + communicationLayer.getRandom() + " vs " + newHostRandom);
+                throw new RuntimeException("Wrong connection starting: my random " + random + " vs " + newHostRandom);
             }
         }
+    }
+
+    public void start() {
+        communicationLayer.startDiscoverySender(random);
     }
 }

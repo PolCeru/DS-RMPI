@@ -14,5 +14,6 @@ public class VSynchLayer {
         ViewManagerBuilder viewManagerBuilder = new ViewManagerBuilder(this);
         this.handler = new ReliabilityLayer(viewManagerBuilder);
         this.viewManager = viewManagerBuilder.create();
+        viewManager.start();
     }
 }
