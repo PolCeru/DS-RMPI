@@ -1,4 +1,6 @@
 package it.polimi.ds.vsync;
 
-public class VSyncMessage {
+import it.polimi.ds.reliability.KnowledgeableMessage;
+
+public class VSyncMessage extends KnowledgeableMessage {
 }
