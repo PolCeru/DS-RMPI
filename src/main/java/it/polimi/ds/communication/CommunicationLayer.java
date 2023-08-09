@@ -7,6 +7,7 @@ import it.polimi.ds.communication.message.DiscoveryMessage;
 import it.polimi.ds.reliability.ReliabilityMessage;
 import it.polimi.ds.utils.MessageGsonBuilder;
 import it.polimi.ds.vsync.view.ViewManager;
+import it.polimi.ds.vsync.view.ViewManagerBuilder;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -110,18 +111,19 @@ public class CommunicationLayer {
      */
     private final int broadcastInterval;
 
-    private CommunicationLayer(int port, int broadcastInterval) {
+    private CommunicationLayer(int port, int broadcastInterval, ViewManagerBuilder managerBuilder) {
         this.port = port;
         this.broadcastInterval = broadcastInterval;
-        this.viewManager = new ViewManager(this);
+        managerBuilder.setCommunicationLayer(this);
+        this.viewManager = managerBuilder.create();
         init();
     }
 
     /**
      * Construct the protocol with default configuration
      */
-    public static CommunicationLayer defaultConfiguration() {
-        return new CommunicationLayer(DEFAULT_PORT, BROADCAST_INTERVAL);
+    public static CommunicationLayer defaultConfiguration(ViewManagerBuilder managerBuilder) {
+        return new CommunicationLayer(DEFAULT_PORT, BROADCAST_INTERVAL, managerBuilder);
     }
 
     /**
@@ -130,8 +132,8 @@ public class CommunicationLayer {
      * @param port              the port used for communication
      * @param broadcastInterval the interval between discovery messages
      */
-    public static CommunicationLayer customConfiguration(int port, int broadcastInterval) {
-        return new CommunicationLayer(port, broadcastInterval);
+    public static CommunicationLayer customConfiguration(int port, int broadcastInterval, ViewManagerBuilder managerBuilder) {
+        return new CommunicationLayer(port, broadcastInterval, managerBuilder);
     }
 
     /**

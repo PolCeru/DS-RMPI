@@ -3,7 +3,7 @@ package it.polimi.ds.reliability;
 import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.DataMessage;
 import it.polimi.ds.vsync.VSyncMessage;
-import it.polimi.ds.vsync.VSynchLayer;
+import it.polimi.ds.vsync.view.ViewManagerBuilder;
 
 import java.util.HashMap;
 import java.util.Timer;
@@ -44,9 +44,9 @@ public class ReliabilityLayer {
      */
     private final BlockingQueue<ReliabilityMessage> downBuffer = new LinkedBlockingQueue<>();
 
-    public ReliabilityLayer(CommunicationLayer handler) {
-        this.handler = handler;
-        new VSynchLayer(this);
+    public ReliabilityLayer(ViewManagerBuilder managerBuilder) {
+        managerBuilder.setReliabilityLayer(this);
+        this.handler = CommunicationLayer.defaultConfiguration(managerBuilder);
         new Thread(this::readMessage).start();
     }
 
@@ -56,7 +56,7 @@ public class ReliabilityLayer {
             UUID senderUID = dataMessage.getSenderUID();
             ReliabilityMessage messageReceived = dataMessage.getPayload();
 
-            if (messageReceived.getMessageType() == MessageType.ACK){
+            if (messageReceived.getMessageType() == MessageType.ACK) {
                 //gets the referencedMessage, which is the message that matches message.getReferenceMessageID()
                 //TODO: if exception is thrown it means that an ack has been received for a non-existing message |*|
                 // --> client is "hacked" -> disconnect?

@@ -1,6 +1,8 @@
 package it.polimi.ds.vsync.view;
 
 import it.polimi.ds.communication.CommunicationLayer;
+import it.polimi.ds.reliability.ReliabilityLayer;
+import it.polimi.ds.vsync.VSynchLayer;
 
 import java.net.InetAddress;
 import java.net.Socket;
@@ -17,7 +19,7 @@ public class ViewManager {
 
     private final List<UUID> connectedHosts = new LinkedList<>();
 
-    public ViewManager(CommunicationLayer communicationLayer) {
+    public ViewManager(VSynchLayer vSynchLayer, ReliabilityLayer reliabilityLayer, CommunicationLayer communicationLayer) {
         this.communicationLayer = communicationLayer;
     }
 
