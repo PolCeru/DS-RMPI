@@ -1,0 +1,10 @@
+services:
+  java:
+    build: .
+    networks:
+      - javanet
+
+networks:
+  javanet:
+    name: javanet
+    external: true
