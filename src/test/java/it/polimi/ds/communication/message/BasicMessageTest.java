@@ -25,7 +25,7 @@ class BasicMessageTest {
         void discoveryMessageSerialization() {
             LocalDateTime time = LocalDateTime.now();
             UUID uuid = UUID.randomUUID();
-            DiscoveryMessage message = new DiscoveryMessage(time, uuid, 4445);
+            DiscoveryMessage message = new DiscoveryMessage(time, uuid);
             try {
                 Method privateMethod = CommunicationLayer.class.getDeclaredMethod("encodeMessage", BasicMessage.class);
                 privateMethod.setAccessible(true);
@@ -42,7 +42,7 @@ class BasicMessageTest {
         void discoveryMessageDeserialization() {
             LocalDateTime time = LocalDateTime.now();
             UUID uuid = UUID.randomUUID();
-            DiscoveryMessage message = new DiscoveryMessage(time, uuid, 4445);
+            DiscoveryMessage message = new DiscoveryMessage(time, uuid);
             try {
                 Method privateMethod = CommunicationLayer.class.getDeclaredMethod("encodeMessage", BasicMessage.class);
                 privateMethod.setAccessible(true);
