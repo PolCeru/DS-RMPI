@@ -3,6 +3,10 @@ services:
     build: .
     networks:
       - javanet
+    deploy:
+      mode: replicated
+      replicas: 2
+
 
 networks:
   javanet:
