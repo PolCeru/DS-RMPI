@@ -142,7 +142,7 @@ public class CommunicationLayer {
         new Thread(this::startServerListener, "Server Listener").start();
     }
 
-    synchronized public void initConnection(InetAddress address, int random, UUID newUUID, BasicMessage message) {
+    synchronized public void initConnection(InetAddress address, UUID newUUID, BasicMessage message) {
         try (Socket socket = new Socket(address, port)) {
             socket.getOutputStream().write(encodeMessage(message));
             addClient(newUUID, socket);

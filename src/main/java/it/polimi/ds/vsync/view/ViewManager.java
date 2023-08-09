@@ -1,11 +1,13 @@
 package it.polimi.ds.vsync.view;
 
 import it.polimi.ds.communication.CommunicationLayer;
+import it.polimi.ds.communication.message.DiscoveryMessage;
 import it.polimi.ds.reliability.ReliabilityLayer;
 import it.polimi.ds.vsync.VSynchLayer;
 
 import java.net.InetAddress;
 import java.net.Socket;
+import java.time.LocalDateTime;
 import java.util.*;
 
 public class ViewManager {
@@ -37,7 +39,7 @@ public class ViewManager {
         // first connection between devices
         if (!isConnected) {
             if (random < newHostRandom) {
-                communicationLayer.initConnection(newHostAddress, newHostRandom, newHostId);
+                communicationLayer.initConnection(newHostAddress, newHostId, new DiscoveryMessage(LocalDateTime.now(), uuid, random));
                 communicationLayer.stopDiscoverySender();
                 connectedHosts.add(newHostId);
                 isConnected = true;
