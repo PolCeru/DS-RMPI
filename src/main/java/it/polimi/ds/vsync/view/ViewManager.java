@@ -35,7 +35,7 @@ public class ViewManager {
 
     public synchronized void handleNewHost(UUID newHostId, int newHostRandom, InetAddress newHostAddress) {
         // already connected, so discard
-        if (connectedHosts.contains(newHostId)) return;
+        if (connectedHosts.contains(newHostId) || newHostId.equals(uuid)) return;
         // first connection between devices
         if (!isConnected) {
             if (random < newHostRandom) {
