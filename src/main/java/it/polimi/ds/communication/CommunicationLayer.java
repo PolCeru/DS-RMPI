@@ -36,8 +36,8 @@ public class CommunicationLayer {
      */
     public void startDiscoverySender(int random) {
         timer = new Timer();
-        try (DatagramSocket socket = new DatagramSocket()) {
-            timer.scheduleAtFixedRate(new DiscoverySender(random, socket), 0, broadcastInterval);
+        try {
+            timer.scheduleAtFixedRate(new DiscoverySender(random), 0, broadcastInterval);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -252,8 +252,8 @@ public class CommunicationLayer {
         private final DatagramSocket broadcastSocket;
         private final int random;
 
-        private DiscoverySender(int random, DatagramSocket socket) throws SocketException {
-            this.broadcastSocket = socket;
+        private DiscoverySender(int random) throws SocketException {
+            this.broadcastSocket = new DatagramSocket();
             this.broadcastSocket.setBroadcast(true);
             this.random = random;
         }
