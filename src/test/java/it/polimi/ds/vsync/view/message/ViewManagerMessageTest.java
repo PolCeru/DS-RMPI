@@ -21,7 +21,7 @@ public class ViewManagerMessageTest {
         @DisplayName("Serialization of initial topology message with empty view")
         void EmptyTopologySerialization(){
             Gson gson = new MessageGsonBuilder().registerViewMessageAdapter().create();
-            InitialTopologyMessage message = new InitialTopologyMessage(new ArrayList<>());
+            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), new ArrayList<>());
             String json = gson.toJson(message);
             System.out.println(json);
         }
@@ -33,7 +33,7 @@ public class ViewManagerMessageTest {
             ArrayList<HostInfo> topology = new ArrayList<HostInfo>();
             topology.add(new HostInfo(UUID.randomUUID(), InetAddress.getLoopbackAddress()));
             topology.add(new HostInfo(UUID.randomUUID(), InetAddress.getLoopbackAddress()));
-            InitialTopologyMessage message = new InitialTopologyMessage(topology);
+            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), topology);
             String json = gson.toJson(message);
             System.out.println(json);
         }
@@ -42,7 +42,7 @@ public class ViewManagerMessageTest {
         @DisplayName("Deserialization of initial topology message with empty view")
         void EmptyTopologyDeSerialization(){
             Gson gson = new MessageGsonBuilder().registerViewMessageAdapter().create();
-            InitialTopologyMessage message = new InitialTopologyMessage(new ArrayList<>());
+            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), new ArrayList<>());
             String json = gson.toJson(message);
             InitialTopologyMessage deserializedMessage = (InitialTopologyMessage) gson.fromJson(json, ViewManagerMessage.class);
             assertEquals(message, deserializedMessage);
@@ -55,7 +55,7 @@ public class ViewManagerMessageTest {
             ArrayList<HostInfo> topology = new ArrayList<HostInfo>();
             topology.add(new HostInfo(UUID.randomUUID(), InetAddress.getLoopbackAddress()));
             topology.add(new HostInfo(UUID.randomUUID(), InetAddress.getLoopbackAddress()));
-            InitialTopologyMessage message = new InitialTopologyMessage(topology);
+            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), topology);
             String json = gson.toJson(message);
             InitialTopologyMessage deserializedMessage = (InitialTopologyMessage) gson.fromJson(json, ViewManagerMessage.class);
             assertEquals(message, deserializedMessage);

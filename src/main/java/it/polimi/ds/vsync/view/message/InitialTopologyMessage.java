@@ -4,12 +4,16 @@ import it.polimi.ds.vsync.view.HostInfo;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 public class InitialTopologyMessage extends ViewManagerMessage {
     final List<HostInfo> topology;
 
-    public InitialTopologyMessage( List<HostInfo> topology) {
+    final UUID viewManagerId;
+
+    public InitialTopologyMessage(UUID viewManagerId, List<HostInfo> topology) {
         super(ViewChangeType.INIT_VIEW);
+        this.viewManagerId = viewManagerId;
         this.topology = topology;
     }
 
