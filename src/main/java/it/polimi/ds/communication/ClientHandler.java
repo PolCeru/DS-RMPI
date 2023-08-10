@@ -39,7 +39,7 @@ public class ClientHandler implements Runnable {
      */
     @Override
     public void run() {
-        new Thread(this::receiveMessage).start();
+        new Thread(this::receiveMessage, "ClientHandler:" + clientID).start();
     }
 
     /**
