@@ -9,8 +9,9 @@ import it.polimi.ds.utils.MessageGsonBuilder;
 import it.polimi.ds.vsync.view.ViewManager;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -143,8 +144,12 @@ public class CommunicationLayer {
     }
 
     synchronized public void initConnection(InetAddress address, UUID newUUID, BasicMessage message) {
-        try (Socket socket = new Socket(address, port)) {
-            socket.getOutputStream().write(encodeMessage(message));
+        try {
+            Socket socket = new Socket(address, port);
+            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            byte[] encoding = encodeMessage(message);
+            out.writeInt(encoding.length);
+            out.write(encoding);
             addClient(newUUID, socket);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -160,21 +165,19 @@ public class CommunicationLayer {
     }
 
     /**
-     * Start a thread that listen for discovery messages sent to a TCP socket; when a new {@link DiscoveryMessage} is
-     * received from this socket a connection with the associated device is established.
+     * Create a client handler for the corresponding real device (identified by the senderUID) and start the main
+     * thread of the client handler
+     *
+     * @param senderUID the senderUID of the device to connect to
+     * @param socket    the socket used to communicate with the device
      */
-    private void startServerListener() {
-        InputStream inputStream;
-        byte[] buffer;
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            while (true) {
-                Socket socket = serverSocket.accept();
-                inputStream = socket.getInputStream();
-                buffer = inputStream.readNBytes(1024);
-                DiscoveryMessage message = (DiscoveryMessage) decodeMessage(buffer, buffer.length);
-                System.out.println("Received connection message from " + socket.getInetAddress().getHostAddress() + " - " + message.getRandom());
-                viewManager.handleNewConnection(message.getSenderUID(), message.getRandom(), socket);
-            }
+    synchronized public void addClient(UUID senderUID, Socket socket) {
+        try {
+            ClientHandler clientHandler = new ClientHandler(senderUID, socket, this);
+            connectedClients.put(senderUID, clientHandler);
+            new Thread(clientHandler).start();
+            if (!isConnected) isConnected = !isConnected;
+            System.out.println("Successfully connected with device " + socket.getInetAddress().getHostAddress());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -202,18 +205,25 @@ public class CommunicationLayer {
     }
 
     /**
-     * Create a client handler for the corresponding real device (identified by the senderUID) and start the main
-     * thread of the client handler
-     *
-     * @param senderUID the senderUID of the device to connect to
-     * @param socket    the socket used to communicate with the device
+     * Start a thread that listen for discovery messages sent to a TCP socket; when a new {@link DiscoveryMessage} is
+     * received from this socket a connection with the associated device is established.
      */
-    synchronized public void addClient(UUID senderUID, Socket socket) {
-        ClientHandler clientHandler = new ClientHandler(senderUID, socket, this);
-        connectedClients.put(senderUID, clientHandler);
-        new Thread(clientHandler).start();
-        if (!isConnected) isConnected = !isConnected;
-        System.out.println("Successfully connected with device " + socket.getInetAddress().getHostAddress());
+    private void startServerListener() {
+        byte[] buffer;
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            while (true) {
+                Socket socket = serverSocket.accept();
+                DataInputStream in = new DataInputStream(socket.getInputStream());
+                int lenght = in.readInt();
+                buffer = new byte[lenght];
+                in.read(buffer);
+                DiscoveryMessage message = (DiscoveryMessage) decodeMessage(buffer, buffer.length);
+                System.out.println("Received connection message from " + socket.getInetAddress().getHostAddress() + " - " + message.getRandom());
+                viewManager.handleNewConnection(message.getSenderUID(), message.getRandom(), socket);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
