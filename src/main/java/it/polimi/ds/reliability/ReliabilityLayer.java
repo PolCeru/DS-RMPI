@@ -3,6 +3,7 @@ package it.polimi.ds.reliability;
 import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.DataMessage;
 import it.polimi.ds.vsync.VSyncMessage;
+import it.polimi.ds.vsync.view.ViewManager;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
 
 import java.util.HashMap;
@@ -22,7 +23,12 @@ public class ReliabilityLayer {
     /**
      * The communication layer to use to send and receive messages
      */
-    private final CommunicationLayer handler;
+    private CommunicationLayer handler;
+
+    /**
+     * The view manager to use to keep track of the views
+     */
+    private final ViewManager viewManager;
 
     /**
      * Map of messages to be acknowledged, for each message a map of clients and their ack status
@@ -46,6 +52,7 @@ public class ReliabilityLayer {
 
     public ReliabilityLayer(ViewManagerBuilder managerBuilder) {
         managerBuilder.setReliabilityLayer(this);
+        this.viewManager = managerBuilder.create();
         this.handler = CommunicationLayer.defaultConfiguration(managerBuilder);
         new Thread(this::readMessage).start();
     }
@@ -101,25 +108,30 @@ public class ReliabilityLayer {
 
             handler.sendMessageBroadcast(message);
             //Init ack map for this message
-            for (UUID uuid : handler.getConnectedClients().keySet()) singleAck.put(uuid, false);
+            //FIXME: add a check to avoid keeping track of the sender
+            // DONE; MUST CHECK CORRECTNESS
+            for (UUID uuid : handler.getConnectedClients().keySet()) {
+                if (!uuid.equals(viewManager.getClientUID()))
+                    singleAck.put(uuid, false);
+            }
             ackMap.put(message, singleAck);
             timer.scheduleAtFixedRate(new TimerTask() {
                 @Override
                 public void run() {
-                ackMap.get(message).forEach((UUID, ackFlag) -> {
-                    //If the message is not acknowledged
-                    //and is not in the retries map, add it and send it again
-                    //otherwise check if the number of retries is less than MAX_RETRIES
-                    //and send it again or disconnect the client
-                    if (!ackFlag)
-                        if (!retries.containsKey(message)) {
-                            retries.put(message, 1);
-                            handler.sendMessage(UUID, message);
-                        } else if (retries.get(message) <= MAX_RETRIES) {
-                            retries.put(message, retries.get(message) + 1);
-                            handler.sendMessage(UUID, message);
-                        } else handler.disconnectClient(UUID);
-                });
+                    ackMap.get(message).forEach((UUID, ackFlag) -> {
+                        //If the message is not acknowledged
+                        //and is not in the retries map, add it and send it again
+                        //otherwise check if the number of retries is less than MAX_RETRIES
+                        //and send it again or disconnect the client
+                        if (!ackFlag)
+                            if (!retries.containsKey(message)) {
+                                retries.put(message, 1);
+                                handler.sendMessage(UUID, message);
+                            } else if (retries.get(message) <= MAX_RETRIES) {
+                                retries.put(message, retries.get(message) + 1);
+                                handler.sendMessage(UUID, message);
+                            } else handler.disconnectClient(UUID);
+                    });
                 }
             }, 0, TIMEOUT_RESEND);
         } catch (InterruptedException e) {
@@ -132,12 +144,23 @@ public class ReliabilityLayer {
      *
      * @param message the message to be sent
      */
-    private void sendMessage(VSyncMessage message) {
-        //called by VSynchLayer, converts to reliabilityMessage adds the message to the downBuffer and calls
-        // sendMessageBroadcast
-        //is downBuffer useful at all at this point? can we just send the message directly?
+    public void sendMessage(VSyncMessage message) {
         ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message);
         downBuffer.add(messageToSend);
         sendMessageBroadcast();
+    }
+
+    /**
+     * Used only for testing purposes
+     */
+    void setCommunicationLayer(CommunicationLayer handler) {
+        this.handler = handler;
+    }
+
+    /**
+     * Used only for testing purposes
+     */
+    ViewManager getViewManager() {
+        return viewManager;
     }
 }
