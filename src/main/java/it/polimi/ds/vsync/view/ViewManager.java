@@ -20,7 +20,7 @@ public class ViewManager {
     /**
      * Identify this machine uniquely
      */
-    private final UUID uuid = UUID.randomUUID();
+    private final UUID clientUID = UUID.randomUUID();
 
     private final CommunicationLayer communicationLayer;
     private boolean isConnected = false;
@@ -35,11 +35,11 @@ public class ViewManager {
 
     public synchronized void handleNewHost(UUID newHostId, int newHostRandom, InetAddress newHostAddress) {
         // already connected, so discard
-        if (connectedHosts.contains(newHostId) || newHostId.equals(uuid)) return;
+        if (connectedHosts.contains(newHostId) || newHostId.equals(clientUID)) return;
         // first connection between devices
         if (!isConnected) {
             if (random < newHostRandom) {
-                communicationLayer.initConnection(newHostAddress, newHostId, new DiscoveryMessage(LocalDateTime.now(), uuid, random));
+                communicationLayer.initConnection(newHostAddress, newHostId, new DiscoveryMessage(LocalDateTime.now(), clientUID, random));
                 communicationLayer.stopDiscoverySender();
                 connectedHosts.add(newHostId);
                 isConnected = true;
@@ -71,6 +71,10 @@ public class ViewManager {
     }
 
     public void start() {
-        communicationLayer.startDiscoverySender(uuid, random);
+        communicationLayer.startDiscoverySender(clientUID, random);
+    }
+
+    public UUID getClientUID() {
+        return clientUID;
     }
 }
