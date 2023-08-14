@@ -4,6 +4,8 @@ import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.DiscoveryMessage;
 import it.polimi.ds.reliability.ReliabilityLayer;
 import it.polimi.ds.vsync.VSynchLayer;
+import it.polimi.ds.vsync.view.message.AdvertiseMessage;
+import it.polimi.ds.vsync.view.message.ViewManagerMessage;
 
 import java.net.InetAddress;
 import java.net.Socket;
@@ -23,6 +25,8 @@ public class ViewManager {
     private final UUID uuid = UUID.randomUUID();
 
     private final CommunicationLayer communicationLayer;
+
+    private final ReliabilityLayer reliabilityLayer;
     private boolean isConnected = false;
 
     private Optional<UUID> realViewManager = Optional.empty();
@@ -31,6 +35,7 @@ public class ViewManager {
 
     public ViewManager(VSynchLayer vSynchLayer, ReliabilityLayer reliabilityLayer, CommunicationLayer communicationLayer) {
         this.communicationLayer = communicationLayer;
+        this.reliabilityLayer = reliabilityLayer;
     }
 
     public synchronized void handleNewHost(UUID newHostId, int newHostRandom, InetAddress newHostAddress) {
@@ -49,7 +54,7 @@ public class ViewManager {
         } else if (realViewManager.isEmpty()) {
             //TODO: handle creation logic and propagation of the view
         } else {
-            //TODO: send AdvertiseMessage to the view manager
+            reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new AdvertiseMessage(newHostAddress, newHostId));
         }
     }
 
@@ -72,5 +77,9 @@ public class ViewManager {
 
     public void start() {
         communicationLayer.startDiscoverySender(uuid, random);
+    }
+
+    public void handleViewMessage(ViewManagerMessage message) {
+
     }
 }
