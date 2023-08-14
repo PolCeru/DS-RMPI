@@ -3,12 +3,11 @@ package it.polimi.ds.reliability;
 import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.DataMessage;
 import it.polimi.ds.vsync.VSyncMessage;
+import it.polimi.ds.vsync.view.ViewManager;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
+import it.polimi.ds.vsync.view.message.ViewManagerMessage;
 
-import java.util.HashMap;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -44,9 +43,12 @@ public class ReliabilityLayer {
      */
     private final BlockingQueue<ReliabilityMessage> downBuffer = new LinkedBlockingQueue<>();
 
+    private final ViewManager viewManager;
+
     public ReliabilityLayer(ViewManagerBuilder managerBuilder) {
         managerBuilder.setReliabilityLayer(this);
         this.handler = CommunicationLayer.defaultConfiguration(managerBuilder);
+        viewManager = managerBuilder.create();
         new Thread(this::readMessage).start();
     }
 
@@ -106,20 +108,20 @@ public class ReliabilityLayer {
             timer.scheduleAtFixedRate(new TimerTask() {
                 @Override
                 public void run() {
-                ackMap.get(message).forEach((UUID, ackFlag) -> {
-                    //If the message is not acknowledged
-                    //and is not in the retries map, add it and send it again
-                    //otherwise check if the number of retries is less than MAX_RETRIES
-                    //and send it again or disconnect the client
-                    if (!ackFlag)
-                        if (!retries.containsKey(message)) {
-                            retries.put(message, 1);
-                            handler.sendMessage(UUID, message);
-                        } else if (retries.get(message) <= MAX_RETRIES) {
-                            retries.put(message, retries.get(message) + 1);
-                            handler.sendMessage(UUID, message);
-                        } else handler.disconnectClient(UUID);
-                });
+                    ackMap.get(message).forEach((UUID, ackFlag) -> {
+                        //If the message is not acknowledged
+                        //and is not in the retries map, add it and send it again
+                        //otherwise check if the number of retries is less than MAX_RETRIES
+                        //and send it again or disconnect the client
+                        if (!ackFlag)
+                            if (!retries.containsKey(message)) {
+                                retries.put(message, 1);
+                                handler.sendMessage(UUID, message);
+                            } else if (retries.get(message) <= MAX_RETRIES) {
+                                retries.put(message, retries.get(message) + 1);
+                                handler.sendMessage(UUID, message);
+                            } else handler.disconnectClient(UUID);
+                    });
                 }
             }, 0, TIMEOUT_RESEND);
         } catch (InterruptedException e) {
@@ -139,5 +141,31 @@ public class ReliabilityLayer {
         ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message);
         downBuffer.add(messageToSend);
         sendMessageBroadcast();
+    }
+
+    public void sendViewMessage(List<UUID> destinations, ViewManagerMessage message) {
+        Timer timer = new Timer();
+        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message);
+        HashMap<UUID, Boolean> map = new HashMap<>();
+        destinations.forEach(uuid -> map.put(uuid, Boolean.FALSE));
+        for (UUID destination : destinations) {
+            ackMap.put(messageToSend, map);
+            handler.sendMessage(destination, messageToSend);
+            timer.scheduleAtFixedRate(new TimerTask() {
+                @Override
+                public void run() {
+                    ackMap.get(messageToSend).forEach((UUID, ackFlag) -> {
+                        if (!ackFlag)
+                            if (!retries.containsKey(messageToSend)) {
+                                retries.put(messageToSend, 1);
+                                handler.sendMessage(UUID, messageToSend);
+                            } else if (retries.get(messageToSend) <= MAX_RETRIES) {
+                                retries.put(messageToSend, retries.get(messageToSend) + 1);
+                                handler.sendMessage(UUID, messageToSend);
+                            } else handler.disconnectClient(UUID);
+                    });
+                }
+            }, 0, 5000);
+        }
     }
 }
