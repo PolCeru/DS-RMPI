@@ -38,6 +38,13 @@ public class ViewManager {
         this.reliabilityLayer = reliabilityLayer;
     }
 
+    /**
+     * Handle what happen when a new host is detected over the broadcast network
+     *
+     * @param newHostId      the new host UUID
+     * @param newHostRandom  the new host random number
+     * @param newHostAddress the new host IP address
+     */
     public synchronized void handleNewHost(UUID newHostId, int newHostRandom, InetAddress newHostAddress) {
         // already connected, so discard
         if (connectedHosts.contains(newHostId) || newHostId.equals(uuid)) return;
@@ -58,6 +65,13 @@ public class ViewManager {
         }
     }
 
+    /**
+     * Handle what happen when we receive a {@link DiscoveryMessage} over the TCP connection
+     *
+     * @param newHostId     the new host UUID
+     * @param newHostRandom the new host random number
+     * @param socket        the new host created by the TCP server when received the connection
+     */
     public synchronized void handleNewConnection(UUID newHostId, int newHostRandom, Socket socket) {
         //already connected, so discard
         if (connectedHosts.contains(newHostId)) return;
@@ -75,11 +89,14 @@ public class ViewManager {
         }
     }
 
+    /**
+     * Test method, used temporary to start the library functionality of this class
+     * TODO remove and add proper server functionality
+     */
     public void start() {
         communicationLayer.startDiscoverySender(uuid, random);
     }
 
     public void handleViewMessage(ViewManagerMessage message) {
-
     }
 }
