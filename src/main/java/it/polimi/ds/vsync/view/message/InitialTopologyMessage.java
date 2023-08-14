@@ -5,9 +5,9 @@ import java.util.Objects;
 import java.util.UUID;
 
 public class InitialTopologyMessage extends ViewManagerMessage {
-    final List<UUID> topology;
+    public final List<UUID> topology;
 
-    final UUID viewManagerId;
+    public final UUID viewManagerId;
 
     public InitialTopologyMessage(UUID viewManagerId, List<UUID> topology) {
         super(ViewChangeType.INIT_VIEW);
