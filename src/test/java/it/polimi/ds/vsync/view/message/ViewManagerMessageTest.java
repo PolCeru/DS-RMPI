@@ -18,7 +18,7 @@ public class ViewManagerMessageTest {
         @Test
         @DisplayName("Serialization of initial topology message with empty view")
         void EmptyTopologySerialization(){
-            Gson gson = new MessageGsonBuilder().registerViewMessageAdapter().create();
+            Gson gson = new MessageGsonBuilder().registerViewMessageAdapter().registerKnowledgeableMessage().create();
             InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), new ArrayList<>());
             String json = gson.toJson(message);
             System.out.println(json);
