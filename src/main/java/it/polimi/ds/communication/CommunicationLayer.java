@@ -10,7 +10,6 @@ import it.polimi.ds.vsync.view.ViewManager;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
 
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
@@ -143,13 +142,9 @@ public class CommunicationLayer {
         new Thread(this::startServerListener, "Server Listener").start();
     }
 
-    synchronized public void initConnection(InetAddress address, UUID newUUID, BasicMessage message) {
+    synchronized public void initConnection(InetAddress address, UUID newUUID) {
         try {
             Socket socket = new Socket(address, port);
-            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-            byte[] encoding = encodeMessage(message);
-            out.writeInt(encoding.length);
-            out.write(encoding);
             addClient(newUUID, socket);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -217,9 +212,10 @@ public class CommunicationLayer {
                 int lenght = in.readInt();
                 buffer = new byte[lenght];
                 in.read(buffer);
-                DiscoveryMessage message = (DiscoveryMessage) decodeMessage(buffer, buffer.length);
-                System.out.println("Received connection message from " + socket.getInetAddress().getHostAddress() + " - " + message.getRandom());
-                viewManager.handleNewConnection(message.getSenderUID(), message.getRandom(), socket);
+                DataMessage message = (DataMessage) decodeMessage(buffer, lenght);
+                upBuffer.add(message);
+                addClient(message.getSenderUID(), socket);
+                System.out.println("Connected with " + socket.getInetAddress().getHostAddress() + " " + message.getSenderUID());
             }
         } catch (IOException e) {
             throw new RuntimeException(e);

@@ -5,11 +5,11 @@ import it.polimi.ds.communication.message.DiscoveryMessage;
 import it.polimi.ds.reliability.ReliabilityLayer;
 import it.polimi.ds.vsync.VSynchLayer;
 import it.polimi.ds.vsync.view.message.AdvertiseMessage;
+import it.polimi.ds.vsync.view.message.ConfirmViewChangeMessage;
+import it.polimi.ds.vsync.view.message.InitialTopologyMessage;
 import it.polimi.ds.vsync.view.message.ViewManagerMessage;
 
 import java.net.InetAddress;
-import java.net.Socket;
-import java.time.LocalDateTime;
 import java.util.*;
 
 public class ViewManager {
@@ -51,10 +51,9 @@ public class ViewManager {
         // first connection between devices
         if (!isConnected) {
             if (random < newHostRandom) {
-                communicationLayer.initConnection(newHostAddress, newHostId, new DiscoveryMessage(LocalDateTime.now(), uuid, random));
+                communicationLayer.initConnection(newHostAddress, newHostId);
                 communicationLayer.stopDiscoverySender();
-                connectedHosts.add(newHostId);
-                isConnected = true;
+                reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), new InitialTopologyMessage(uuid, getCompleteTopology()));
             } else {
                 System.out.println("DiscoveryMessage from " + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
             }
@@ -65,28 +64,10 @@ public class ViewManager {
         }
     }
 
-    /**
-     * Handle what happen when we receive a {@link DiscoveryMessage} over the TCP connection
-     *
-     * @param newHostId     the new host UUID
-     * @param newHostRandom the new host random number
-     * @param socket        the new host created by the TCP server when received the connection
-     */
-    public synchronized void handleNewConnection(UUID newHostId, int newHostRandom, Socket socket) {
-        //already connected, so discard
-        if (connectedHosts.contains(newHostId)) return;
-        // first connection between device
-        if (!isConnected) {
-            //check correct master
-            if (random >= newHostRandom) {
-                communicationLayer.addClient(newHostId, socket);
-                communicationLayer.stopDiscoverySender();
-                isConnected = true;
-                connectedHosts.add(newHostId);
-            } else {
-                throw new RuntimeException("Wrong connection starting: my random " + random + " vs " + newHostRandom);
-            }
-        }
+    private List<UUID> getCompleteTopology() {
+        List<UUID> uuids = new ArrayList<>(connectedHosts);
+        uuids.add(uuid);
+        return uuids;
     }
 
     /**
@@ -97,6 +78,48 @@ public class ViewManager {
         communicationLayer.startDiscoverySender(uuid, random);
     }
 
-    public void handleViewMessage(ViewManagerMessage message) {
+    public void handleViewMessage(ViewManagerMessage baseMessage) {
+        switch (baseMessage.messageType) {
+            case CONFIRM -> {
+                ConfirmViewChangeMessage message = (ConfirmViewChangeMessage) baseMessage;
+                if (!isConnected) {
+                    connectedHosts.add(message.senderUid);
+                    isConnected = true;
+                } else {
+                    //TODO what action confirm this operation??
+                }
+            }
+            case INIT_VIEW -> {
+                InitialTopologyMessage message = (InitialTopologyMessage) baseMessage;
+                if (!isConnected) {
+                    realViewManager = Optional.of(message.viewManagerId);
+                    if (message.topology.size() == 1) {
+                        //only the viewManager connected
+                        handleNewConnection(realViewManager.get());
+                    } else {
+                        //TODO implement method that create a waitingList with provided list,
+                        // confirm that's ready to viewManager and wait for all connections
+                    }
+                } else {
+                    //TODO manage the error or avoid?
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle what happen when we receive a {@link DiscoveryMessage} over the TCP connection
+     *
+     * @param newHostId     the new host UUID
+     */
+    public synchronized void handleNewConnection(UUID newHostId) {
+        //already connected, so discard
+        if (connectedHosts.contains(newHostId)) return;
+        // first connection between device
+        if (!isConnected) {
+            communicationLayer.stopDiscoverySender();
+            isConnected = true;
+            connectedHosts.add(newHostId);
+        }
     }
 }

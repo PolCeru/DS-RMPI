@@ -134,7 +134,7 @@ public class ReliabilityLayer {
      *
      * @param message the message to be sent
      */
-    private void sendMessage(VSyncMessage message) {
+    public void sendMessage(VSyncMessage message) {
         //called by VSynchLayer, converts to reliabilityMessage adds the message to the downBuffer and calls
         // sendMessageBroadcast
         //is downBuffer useful at all at this point? can we just send the message directly?
