@@ -5,11 +5,9 @@ import it.polimi.ds.communication.message.DataMessage;
 import it.polimi.ds.vsync.VSyncMessage;
 import it.polimi.ds.vsync.view.ViewManager;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
+import it.polimi.ds.vsync.view.message.ViewManagerMessage;
 
-import java.util.HashMap;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -23,12 +21,7 @@ public class ReliabilityLayer {
     /**
      * The communication layer to use to send and receive messages
      */
-    private CommunicationLayer handler;
-
-    /**
-     * The view manager to use to keep track of the views
-     */
-    private final ViewManager viewManager;
+    private final CommunicationLayer handler;
 
     /**
      * Map of messages to be acknowledged, for each message a map of clients and their ack status
@@ -50,10 +43,12 @@ public class ReliabilityLayer {
      */
     private final BlockingQueue<ReliabilityMessage> downBuffer = new LinkedBlockingQueue<>();
 
+    private final ViewManager viewManager;
+
     public ReliabilityLayer(ViewManagerBuilder managerBuilder) {
         managerBuilder.setReliabilityLayer(this);
-        this.viewManager = managerBuilder.create();
         this.handler = CommunicationLayer.defaultConfiguration(managerBuilder);
+        viewManager = managerBuilder.create();
         new Thread(this::readMessage).start();
     }
 
@@ -148,6 +143,32 @@ public class ReliabilityLayer {
         ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message);
         downBuffer.add(messageToSend);
         sendMessageBroadcast();
+    }
+
+    public void sendViewMessage(List<UUID> destinations, ViewManagerMessage message) {
+        Timer timer = new Timer();
+        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message);
+        HashMap<UUID, Boolean> map = new HashMap<>();
+        destinations.forEach(uuid -> map.put(uuid, Boolean.FALSE));
+        for (UUID destination : destinations) {
+            ackMap.put(messageToSend, map);
+            handler.sendMessage(destination, messageToSend);
+            timer.scheduleAtFixedRate(new TimerTask() {
+                @Override
+                public void run() {
+                    ackMap.get(messageToSend).forEach((UUID, ackFlag) -> {
+                        if (!ackFlag)
+                            if (!retries.containsKey(messageToSend)) {
+                                retries.put(messageToSend, 1);
+                                handler.sendMessage(UUID, messageToSend);
+                            } else if (retries.get(messageToSend) <= MAX_RETRIES) {
+                                retries.put(messageToSend, retries.get(messageToSend) + 1);
+                                handler.sendMessage(UUID, messageToSend);
+                            } else handler.disconnectClient(UUID);
+                    });
+                }
+            }, 0, 5000);
+        }
     }
 
     /**

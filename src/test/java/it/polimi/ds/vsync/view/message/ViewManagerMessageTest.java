@@ -2,12 +2,10 @@ package it.polimi.ds.vsync.view.message;
 
 import com.google.gson.Gson;
 import it.polimi.ds.utils.MessageGsonBuilder;
-import it.polimi.ds.vsync.view.HostInfo;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.UUID;
 
@@ -20,7 +18,7 @@ public class ViewManagerMessageTest {
         @Test
         @DisplayName("Serialization of initial topology message with empty view")
         void EmptyTopologySerialization(){
-            Gson gson = new MessageGsonBuilder().registerViewMessageAdapter().create();
+            Gson gson = new MessageGsonBuilder().registerViewMessageAdapter().registerKnowledgeableMessage().create();
             InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), new ArrayList<>());
             String json = gson.toJson(message);
             System.out.println(json);
@@ -30,9 +28,9 @@ public class ViewManagerMessageTest {
         @DisplayName("Serialization of initial topology message with view")
         void TopologySerialization(){
             Gson gson = new MessageGsonBuilder().registerViewMessageAdapter().create();
-            ArrayList<HostInfo> topology = new ArrayList<HostInfo>();
-            topology.add(new HostInfo(UUID.randomUUID(), InetAddress.getLoopbackAddress()));
-            topology.add(new HostInfo(UUID.randomUUID(), InetAddress.getLoopbackAddress()));
+            ArrayList<UUID> topology = new ArrayList<>();
+            topology.add(UUID.randomUUID());
+            topology.add(UUID.randomUUID());
             InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), topology);
             String json = gson.toJson(message);
             System.out.println(json);
@@ -52,9 +50,9 @@ public class ViewManagerMessageTest {
         @DisplayName("Deserialization of initial topology message with view")
         void TopologyDeSerialization(){
             Gson gson = new MessageGsonBuilder().registerViewMessageAdapter().create();
-            ArrayList<HostInfo> topology = new ArrayList<HostInfo>();
-            topology.add(new HostInfo(UUID.randomUUID(), InetAddress.getLoopbackAddress()));
-            topology.add(new HostInfo(UUID.randomUUID(), InetAddress.getLoopbackAddress()));
+            ArrayList<UUID> topology = new ArrayList<>();
+            topology.add(UUID.randomUUID());
+            topology.add(UUID.randomUUID());
             InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), topology);
             String json = gson.toJson(message);
             InitialTopologyMessage deserializedMessage = (InitialTopologyMessage) gson.fromJson(json, ViewManagerMessage.class);

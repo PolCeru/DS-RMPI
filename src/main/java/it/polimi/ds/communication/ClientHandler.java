@@ -3,6 +3,8 @@ package it.polimi.ds.communication;
 
 import it.polimi.ds.communication.message.DataMessage;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -18,19 +20,18 @@ public class ClientHandler implements Runnable {
      */
     private final UUID clientID;
 
-    /**
-     * The socket is the connection between this client and the other client
-     */
-    private final Socket socket;
+    private final DataInputStream inputStream;
+    private final DataOutputStream outputStream;
 
     /**
      * The messageHandler is the class that will handle the communication between this client and other clients
      */
     private final CommunicationLayer messageHandler;
 
-    public ClientHandler(UUID clientID, Socket socket, CommunicationLayer messageHandler) {
+    public ClientHandler(UUID clientID, Socket socket, CommunicationLayer messageHandler) throws IOException {
         this.clientID = clientID;
-        this.socket = socket;
+        this.inputStream = new DataInputStream(socket.getInputStream());
+        this.outputStream = new DataOutputStream(socket.getOutputStream());
         this.messageHandler = messageHandler;
     }
 
@@ -39,7 +40,7 @@ public class ClientHandler implements Runnable {
      */
     @Override
     public void run() {
-        new Thread(this::receiveMessage).start();
+        new Thread(this::receiveMessage, "ClientHandler:" + clientID).start();
     }
 
     /**
@@ -51,7 +52,8 @@ public class ClientHandler implements Runnable {
     public void sendMessage(byte[] payload) {
         if (messageHandler.isConnected()) {
             try {
-                socket.getOutputStream().write(payload);
+                outputStream.writeInt(payload.length);
+                outputStream.write(payload);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -67,12 +69,14 @@ public class ClientHandler implements Runnable {
         while (messageHandler.isConnected()) {
             byte[] payload;
             try {
-                payload = socket.getInputStream().readAllBytes();
+                int length = inputStream.readInt();
+                payload = new byte[length];
+                inputStream.read(payload);
+                DataMessage message = CommunicationLayer.gson.fromJson(new String(payload, StandardCharsets.UTF_8), DataMessage.class);
+                messageHandler.getUpBuffer().add(message);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            DataMessage message = CommunicationLayer.gson.fromJson(new String(payload, StandardCharsets.UTF_8), DataMessage.class);
-            messageHandler.getUpBuffer().add(message);
         }
     }
 
