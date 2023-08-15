@@ -244,8 +244,6 @@ public class CommunicationLayer {
     synchronized public void sendMessage(UUID clientID, ReliabilityMessage message) {
         ClientHandler clientHandler = connectedClients.get(clientID);
         if (clientHandler != null) {
-            //TODO: check if the client is not the sender of the message
-            // DONE; MUST CHECK CORRECTNESS
             if(!clientID.equals(viewManager.getClientUID())){
                 clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(), clientID, message)));
             } throw new RuntimeException("Trying to send a message to itself");
@@ -259,8 +257,6 @@ public class CommunicationLayer {
      */
     synchronized public void sendMessageBroadcast(ReliabilityMessage message) {
         for (ClientHandler clientHandler : connectedClients.values()) {
-            //FIXME: avoid sending ACK to the same client that sent the message
-            // DONE; MUST CHECK CORRECTNESS
             if(!clientHandler.getClientUID().equals(viewManager.getClientUID()))
                 clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(),
                         viewManager.getClientUID(), message)));
