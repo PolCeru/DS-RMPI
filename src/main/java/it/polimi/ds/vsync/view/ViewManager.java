@@ -22,7 +22,7 @@ public class ViewManager {
     /**
      * Identify this machine uniquely
      */
-    private final UUID uuid = UUID.randomUUID();
+    private final UUID clientUID = UUID.randomUUID();
 
     private final CommunicationLayer communicationLayer;
 
@@ -47,13 +47,13 @@ public class ViewManager {
      */
     public synchronized void handleNewHost(UUID newHostId, int newHostRandom, InetAddress newHostAddress) {
         // already connected, so discard
-        if (connectedHosts.contains(newHostId) || newHostId.equals(uuid)) return;
+        if (connectedHosts.contains(newHostId) || newHostId.equals(clientUID)) return;
         // first connection between devices
         if (!isConnected) {
             if (random < newHostRandom) {
                 communicationLayer.initConnection(newHostAddress, newHostId);
                 communicationLayer.stopDiscoverySender();
-                reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), new InitialTopologyMessage(uuid, getCompleteTopology()));
+                reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), new InitialTopologyMessage(clientUID, getCompleteTopology()));
             } else {
                 System.out.println("DiscoveryMessage from " + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
             }
@@ -66,7 +66,7 @@ public class ViewManager {
 
     private List<UUID> getCompleteTopology() {
         List<UUID> uuids = new ArrayList<>(connectedHosts);
-        uuids.add(uuid);
+        uuids.add(clientUID);
         return uuids;
     }
 
@@ -75,7 +75,7 @@ public class ViewManager {
      * TODO remove and add proper server functionality
      */
     public void start() {
-        communicationLayer.startDiscoverySender(uuid, random);
+        communicationLayer.startDiscoverySender(clientUID, random);
     }
 
     public void handleViewMessage(ViewManagerMessage baseMessage) {
