@@ -29,7 +29,6 @@ import java.util.concurrent.LinkedBlockingQueue;
  * </ul></p>
  */
 public class CommunicationLayer {
-
     /**
      * Start a scheduled task that send discovery messages periodically on the UDP broadcast network; the period is defined by
      * the initial configuration of this protocol
@@ -47,6 +46,7 @@ public class CommunicationLayer {
      * Default broadcast address
      */
     private static final String BROADCAST_ADDR = "255.255.255.255";
+
     /**
      * Default communication port
      */
@@ -57,8 +57,14 @@ public class CommunicationLayer {
      */
     private static final int BROADCAST_INTERVAL = 10000;
 
+    /**
+     * Timer used to schedule the discovery messages
+     */
     private Timer timer;
 
+    /**
+     * The view manager used to handle the view of the network
+     */
     private final ViewManager viewManager;
 
     /**
@@ -137,11 +143,17 @@ public class CommunicationLayer {
      * Start the required threads to allow the discovery of other devices on the network and the listeners to allow
      * connections
      */
-    protected void init() {
+    void init() {
         new Thread(this::startDiscoveryListener, "Discovery Listener").start();
         new Thread(this::startServerListener, "Server Listener").start();
     }
 
+    /**
+     * Create a TCP socket with the device identified by the address and the UUID and start a client handler for it
+     *
+     * @param address the address of the device to connect to
+     * @param newUUID the UUID of the device to connect to
+     */
     synchronized public void initConnection(InetAddress address, UUID newUUID) {
         try {
             Socket socket = new Socket(address, port);
@@ -209,10 +221,10 @@ public class CommunicationLayer {
             while (true) {
                 Socket socket = serverSocket.accept();
                 DataInputStream in = new DataInputStream(socket.getInputStream());
-                int lenght = in.readInt();
-                buffer = new byte[lenght];
+                int length = in.readInt();
+                buffer = new byte[length];
                 in.read(buffer);
-                DataMessage message = (DataMessage) decodeMessage(buffer, lenght);
+                DataMessage message = (DataMessage) decodeMessage(buffer, length);
                 upBuffer.add(message);
                 addClient(message.getSenderUID(), socket);
                 System.out.println("Connected with " + socket.getInetAddress().getHostAddress() + " " + message.getSenderUID());
@@ -249,16 +261,14 @@ public class CommunicationLayer {
         for (ClientHandler clientHandler : connectedClients.values()) {
             //FIXME: avoid sending ACK to the same client that sent the message
             // DONE; MUST CHECK CORRECTNESS
-            if(!clientHandler.getClientID().equals(viewManager.getClientUID()))
+            if(!clientHandler.getClientUID().equals(viewManager.getClientUID()))
                 clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(),
                         viewManager.getClientUID(), message)));
         }
     }
-
     private final class DiscoverySender extends TimerTask {
         private final DatagramSocket broadcastSocket;
         private final int random;
-
         private final UUID id;
 
         private DiscoverySender(UUID id, int random) throws SocketException {

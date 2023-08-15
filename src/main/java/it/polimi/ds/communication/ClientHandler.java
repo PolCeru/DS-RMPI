@@ -1,6 +1,5 @@
 package it.polimi.ds.communication;
 
-
 import it.polimi.ds.communication.message.DataMessage;
 
 import java.io.DataInputStream;
@@ -14,13 +13,19 @@ import java.util.UUID;
  * This class represent another connected client and can send or receive message from this
  */
 public class ClientHandler implements Runnable {
-
     /**
      * The clientID is the unique identifier of this client
      */
-    private final UUID clientID;
+    private final UUID clientUID;
 
+    /**
+     * inputStream is the stream used to receive message from the client
+     */
     private final DataInputStream inputStream;
+
+    /**
+     * outputStream is the stream used to send message to the client
+     */
     private final DataOutputStream outputStream;
 
     /**
@@ -29,7 +34,7 @@ public class ClientHandler implements Runnable {
     private final CommunicationLayer messageHandler;
 
     public ClientHandler(UUID clientID, Socket socket, CommunicationLayer messageHandler) throws IOException {
-        this.clientID = clientID;
+        this.clientUID = clientID;
         this.inputStream = new DataInputStream(socket.getInputStream());
         this.outputStream = new DataOutputStream(socket.getOutputStream());
         this.messageHandler = messageHandler;
@@ -40,7 +45,7 @@ public class ClientHandler implements Runnable {
      */
     @Override
     public void run() {
-        new Thread(this::receiveMessage, "ClientHandler:" + clientID).start();
+        new Thread(this::receiveMessage, "ClientHandler:" + clientUID).start();
     }
 
     /**
@@ -83,7 +88,7 @@ public class ClientHandler implements Runnable {
     /**
      * @return the clientID of this client
      */
-    public UUID getClientID() {
-        return clientID;
+    public UUID getClientUID() {
+        return clientUID;
     }
 }

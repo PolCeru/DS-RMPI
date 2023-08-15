@@ -4,6 +4,10 @@ import java.time.LocalDateTime;
 import java.util.Random;
 import java.util.UUID;
 
+/**
+ * Discovery messages are used to discover the network topology. They are sent by a node to its neighbors when it wants
+ * to join the network. The message contains a random number that is used to identify the sender.
+ */
 public class DiscoveryMessage extends BasicMessage {
 
     final int random;
