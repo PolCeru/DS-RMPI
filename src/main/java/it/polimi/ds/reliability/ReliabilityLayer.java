@@ -21,7 +21,7 @@ public class ReliabilityLayer {
     /**
      * The communication layer to use to send and receive messages
      */
-    private final CommunicationLayer handler;
+    private CommunicationLayer handler;
 
     /**
      * Map of messages to be acknowledged, for each message a map of clients and their ack status

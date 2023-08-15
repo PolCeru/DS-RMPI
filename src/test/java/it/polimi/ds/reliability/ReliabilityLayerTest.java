@@ -11,6 +11,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.io.IOException;
+import java.net.Socket;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -87,9 +89,15 @@ public class ReliabilityLayerTest {
         RL.setCommunicationLayer(mockCL);
         RL2.setCommunicationLayer(mockCL2);
 
-        ClientHandler senderCH = new ClientHandler(senderRL.getViewManager().getClientUID(), null, senderMockCL);
-        ClientHandler receiverCH = new ClientHandler(RL.getViewManager().getClientUID(), null, mockCL);
-        ClientHandler receiverCH2 = new ClientHandler(RL2.getViewManager().getClientUID(), null, mockCL2);
+        //setup connected clients
+        ClientHandler senderCH = null, receiverCH = null, receiverCH2 = null;
+        try {
+            senderCH = new ClientHandler(senderRL.getViewManager().getClientUID(), new Socket(), senderMockCL);
+            receiverCH = new ClientHandler(RL.getViewManager().getClientUID(), new Socket(), mockCL);
+            receiverCH2 = new ClientHandler(RL2.getViewManager().getClientUID(), new Socket(), mockCL2);
+        } catch (IOException e) {
+            System.out.println("Error creating ClientHandler");
+        }
         VSyncMessage messageToSend = new VSyncMessage("test".getBytes());
 
         HashMap<UUID, ClientHandler> connectedClientMock = new HashMap<>();
