@@ -75,7 +75,12 @@ public class CommunicationLayer {
     /**
      * Serializer of basic messages
      */
-    static final Gson gson = new MessageGsonBuilder().registerBasicMessageAdapter().registerLocalDateTimeAdapter().create();
+    static final Gson gson = new MessageGsonBuilder()
+            .registerBasicMessageAdapter()
+            .registerLocalDateTimeAdapter()
+            .registerKnowledgeableMessage()
+            .registerViewMessageAdapter()
+            .create();
 
     /**
      * List of all connected clients
