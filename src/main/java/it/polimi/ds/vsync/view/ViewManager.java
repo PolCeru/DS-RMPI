@@ -10,6 +10,7 @@ import it.polimi.ds.vsync.view.message.InitialTopologyMessage;
 import it.polimi.ds.vsync.view.message.ViewManagerMessage;
 
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.*;
 
 public class ViewManager {
@@ -55,7 +56,7 @@ public class ViewManager {
                 communicationLayer.stopDiscoverySender();
                 reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), new InitialTopologyMessage(clientUID, getCompleteTopology()));
             } else {
-                System.out.println("DiscoveryMessage from " + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
+                System.out.println("New host:" + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
             }
         } else if (realViewManager.isEmpty()) {
             //TODO: handle creation logic and propagation of the view
@@ -75,6 +76,11 @@ public class ViewManager {
      * TODO remove and add proper server functionality
      */
     public void start() {
+        try {
+            System.out.println("Starting host with address " + InetAddress.getLocalHost().getHostAddress() + ", random " + random + " and uuid" + clientUID);
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        }
         communicationLayer.startDiscoverySender(clientUID, random);
     }
 

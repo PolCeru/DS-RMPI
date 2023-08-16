@@ -152,6 +152,7 @@ public class ReliabilityLayer {
         destinations.forEach(uuid -> map.put(uuid, Boolean.FALSE));
         for (UUID destination : destinations) {
             ackMap.put(messageToSend, map);
+            System.out.println("Send message " + message.messageType + " to " + destination);
             handler.sendMessage(destination, messageToSend);
             timer.scheduleAtFixedRate(new TimerTask() {
                 @Override
