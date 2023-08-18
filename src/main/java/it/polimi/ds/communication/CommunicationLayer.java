@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
@@ -61,6 +62,11 @@ public class CommunicationLayer {
      * Timer used to schedule the discovery messages
      */
     private Timer timer;
+
+    /**
+     *
+     */
+    private final CountDownLatch latch = new CountDownLatch(1);
 
     /**
      * The view manager used to handle the view of the network
@@ -233,6 +239,7 @@ public class CommunicationLayer {
             connectedClients.put(senderUID, clientHandler);
             new Thread(clientHandler).start();
             if (!isConnected) isConnected = !isConnected;
+            latch.countDown();
             System.out.println("Create client handler with " + socket.getInetAddress().getHostAddress());
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -243,15 +250,15 @@ public class CommunicationLayer {
      * Send a message to a specific client, used to send an ACK message after a DATA message or to resend a DATA message
      * to a specific client.
      *
-     * @param clientID the client to which the message is sent
+     * @param destinationClientID the client to which the message is sent
      * @param message  the message to be sent
      */
-    synchronized public void sendMessage(UUID clientID, ReliabilityMessage message) {
-        ClientHandler clientHandler = connectedClients.get(clientID);
+    synchronized public void sendMessage(UUID destinationClientID, ReliabilityMessage message) {
+        ClientHandler clientHandler = connectedClients.get(destinationClientID);
         if (clientHandler != null) {
-            if(!clientID.equals(viewManager.getClientUID())){
-                clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(), clientID, message)));
-            } else throw new RuntimeException("Trying to send a message to itself");
+            if(!destinationClientID.equals(viewManager.getClientUID()))
+                clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(),
+                        viewManager.getClientUID(), message)));
         }
     }
 
@@ -262,8 +269,6 @@ public class CommunicationLayer {
      */
     synchronized public void sendMessageBroadcast(ReliabilityMessage message) {
         for (ClientHandler clientHandler : connectedClients.values()) {
-            //FIXME: avoid sending ACK to the same client that sent the message
-            // DONE; MUST CHECK CORRECTNESS
             if(!clientHandler.getClientUID().equals(viewManager.getClientUID()))
                 clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(),
                         viewManager.getClientUID(), message)));
@@ -303,11 +308,15 @@ public class CommunicationLayer {
     public BasicMessage getMessage() {
         try {
             BasicMessage message = upBuffer.take();
-            System.out.println("Message taken");
+            System.out.println("Message taken from the upBuffer of the Communication Layer");
             return message;
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public CountDownLatch getLatch() {
+        return latch;
     }
 
     public void disconnectClient(UUID clientID) {

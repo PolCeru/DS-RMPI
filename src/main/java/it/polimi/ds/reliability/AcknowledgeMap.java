@@ -44,6 +44,10 @@ public class AcknowledgeMap {
         return state.ackMap.entrySet().stream().filter(entry -> entry.getValue().equals(Boolean.FALSE)).map(Map.Entry::getKey).toList();
     }
 
+    public void remove(UUID messageId) {
+        ackMap.remove(messageId);
+    }
+
     private static class MessageState {
         private boolean messageReceived;
         private final Map<UUID, Boolean> ackMap;
