@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
@@ -61,6 +62,11 @@ public class CommunicationLayer {
      * Timer used to schedule the discovery messages
      */
     private Timer timer;
+
+    /**
+     *
+     */
+    private final CountDownLatch latch = new CountDownLatch(1);
 
     /**
      * The view manager used to handle the view of the network
@@ -233,6 +239,7 @@ public class CommunicationLayer {
             connectedClients.put(senderUID, clientHandler);
             new Thread(clientHandler).start();
             if (!isConnected) isConnected = !isConnected;
+            latch.countDown();
             System.out.println("Create client handler with " + socket.getInetAddress().getHostAddress());
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -249,9 +256,8 @@ public class CommunicationLayer {
     synchronized public void sendMessage(UUID clientID, ReliabilityMessage message) {
         ClientHandler clientHandler = connectedClients.get(clientID);
         if (clientHandler != null) {
-            if(!clientID.equals(viewManager.getClientUID())){
+            if(!clientID.equals(viewManager.getClientUID()))
                 clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(), clientID, message)));
-            } else throw new RuntimeException("Trying to send a message to itself");
         }
     }
 
@@ -306,6 +312,10 @@ public class CommunicationLayer {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public CountDownLatch getLatch() {
+        return latch;
     }
 
     public void disconnectClient(UUID clientID) {

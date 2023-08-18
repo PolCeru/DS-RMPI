@@ -54,6 +54,11 @@ public class ReliabilityLayer {
     }
 
     private void readMessage() {
+        try {
+            this.handler.getLatch().await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         while (handler.isConnected()) {
             DataMessage dataMessage = (DataMessage) handler.getMessage();
             UUID senderUID = dataMessage.getSenderUID();
@@ -84,6 +89,8 @@ public class ReliabilityLayer {
             //TODO: handle logic if an ack arrives while ackMap is already true -> discard the ack
             // if(ackMap.get(referencedMessage).get(senderUID))
             else if (messageReceived.getMessageType() == MessageType.DATA) {
+                //TODO: Creare ackmap che tiene conto anche degli ack ricevuti dagli altri client e sistemare il
+                // passaggio di nuovi messaggi alla vsync layer
                 ReliabilityMessage ackMessage = new ReliabilityMessage(UUID.randomUUID(), messageReceived.getMessageID());
                 handler.sendMessage(senderUID, ackMessage);
 
@@ -110,8 +117,6 @@ public class ReliabilityLayer {
 
             handler.sendMessageBroadcast(message);
             //Init ack map for this message
-            //FIXME: add a check to avoid keeping track of the sender
-            // DONE; MUST CHECK CORRECTNESS
             for (UUID uuid : handler.getConnectedClients().keySet()) {
                 if (!uuid.equals(viewManager.getClientUID()))
                     singleAck.put(uuid, false);
@@ -191,5 +196,19 @@ public class ReliabilityLayer {
      */
     ViewManager getViewManager() {
         return viewManager;
+    }
+
+    /**
+     * Used only for testing purposes
+     */
+    HashMap<ReliabilityMessage, HashMap<UUID, Boolean>> getAckMap() {
+        return ackMap;
+    }
+
+    /**
+     * Used only for testing purposes
+     */
+    BlockingQueue<ReliabilityMessage> getUpBuffer() {
+        return upBuffer;
     }
 }
