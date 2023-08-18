@@ -3,7 +3,7 @@ package it.polimi.ds.vsync.view;
 import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.DiscoveryMessage;
 import it.polimi.ds.reliability.ReliabilityLayer;
-import it.polimi.ds.vsync.VSynchLayer;
+import it.polimi.ds.vsync.VSyncLayer;
 import it.polimi.ds.vsync.view.message.AdvertiseMessage;
 import it.polimi.ds.vsync.view.message.ConfirmViewChangeMessage;
 import it.polimi.ds.vsync.view.message.InitialTopologyMessage;
@@ -35,7 +35,7 @@ public class ViewManager {
     private final List<UUID> connectedHosts = new LinkedList<>();
     private final List<UUID> waitingHosts = new LinkedList<>();
 
-    public ViewManager(VSynchLayer vSynchLayer, ReliabilityLayer reliabilityLayer, CommunicationLayer communicationLayer) {
+    public ViewManager(VSyncLayer vSyncLayer, ReliabilityLayer reliabilityLayer, CommunicationLayer communicationLayer) {
         this.communicationLayer = communicationLayer;
         this.reliabilityLayer = reliabilityLayer;
     }

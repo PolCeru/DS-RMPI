@@ -142,7 +142,7 @@ public class ReliabilityLayer {
     }
 
     /**
-     * Gets a message from the upper VSynch layer, wraps it in a ReliabilityMessage and adds it to the downBuffer
+     * Gets a message from the upper VSync layer, wraps it in a ReliabilityMessage and adds it to the downBuffer
      *
      * @param message the message to be sent
      */

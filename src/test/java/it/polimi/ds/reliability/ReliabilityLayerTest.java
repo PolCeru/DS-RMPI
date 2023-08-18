@@ -3,8 +3,8 @@ package it.polimi.ds.reliability;
 import it.polimi.ds.communication.ClientHandler;
 import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.DataMessage;
+import it.polimi.ds.vsync.VSyncLayer;
 import it.polimi.ds.vsync.VSyncMessage;
-import it.polimi.ds.vsync.VSynchLayer;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
 import jdk.jfr.Description;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +31,7 @@ public class ReliabilityLayerTest {
     @Description("Tests that the ReliabilityLayer sends an ACK message when it receives a DataMessage")
     public void testReadDataMessage() {
         // mock creation
-        VSynchLayer mockVSL = mock(VSynchLayer.class);
+        VSyncLayer mockVSL = mock(VSyncLayer.class);
         ViewManagerBuilder VMB = new ViewManagerBuilder(mockVSL);
         CommunicationLayer mockCL = mock(CommunicationLayer.class);
         UUID senderUUID = UUID.randomUUID();
@@ -68,9 +68,9 @@ public class ReliabilityLayerTest {
     @Description("Tests the sending of a DATA message for each connected client")
     public void testReadAckMessage() {
         // mock creation
-        VSynchLayer senderMockVSL = mock(VSynchLayer.class);
-        VSynchLayer mockVSL = mock(VSynchLayer.class);
-        VSynchLayer mockVSL2 = mock(VSynchLayer.class);
+        VSyncLayer senderMockVSL = mock(VSyncLayer.class);
+        VSyncLayer mockVSL = mock(VSyncLayer.class);
+        VSyncLayer mockVSL2 = mock(VSyncLayer.class);
         ViewManagerBuilder senderVMB = new ViewManagerBuilder(senderMockVSL);
         ViewManagerBuilder VMB = new ViewManagerBuilder(mockVSL);
         ViewManagerBuilder VMB2 = new ViewManagerBuilder(mockVSL2);
