@@ -75,7 +75,12 @@ public class CommunicationLayer {
     /**
      * Serializer of basic messages
      */
-    static final Gson gson = new MessageGsonBuilder().registerBasicMessageAdapter().registerLocalDateTimeAdapter().create();
+    static final Gson gson = new MessageGsonBuilder()
+            .registerBasicMessageAdapter()
+            .registerLocalDateTimeAdapter()
+            .registerKnowledgeableMessage()
+            .registerViewMessageAdapter()
+            .create();
 
     /**
      * List of all connected clients
@@ -172,19 +177,23 @@ public class CommunicationLayer {
     }
 
     /**
-     * Create a client handler for the corresponding real device (identified by the senderUID) and start the main
-     * thread of the client handler
-     *
-     * @param senderUID the senderUID of the device to connect to
-     * @param socket    the socket used to communicate with the device
+     * Start a thread that listen for discovery messages sent to a TCP socket; when a new {@link DiscoveryMessage} is
+     * received from this socket a connection with the associated device is established.
      */
-    synchronized public void addClient(UUID senderUID, Socket socket) {
-        try {
-            ClientHandler clientHandler = new ClientHandler(senderUID, socket, this);
-            connectedClients.put(senderUID, clientHandler);
-            new Thread(clientHandler).start();
-            if (!isConnected) isConnected = !isConnected;
-            System.out.println("Successfully connected with device " + socket.getInetAddress().getHostAddress());
+    private void startServerListener() {
+        byte[] buffer;
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            while (true) {
+                Socket socket = serverSocket.accept();
+                DataInputStream in = new DataInputStream(socket.getInputStream());
+                int length = in.readInt();
+                buffer = new byte[length];
+                in.read(buffer);
+                DataMessage message = (DataMessage) decodeMessage(buffer, length);
+                upBuffer.add(message);
+                addClient(message.getSenderUID(), socket);
+                System.out.println("Received connection with " + socket.getInetAddress().getHostAddress());
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -212,23 +221,19 @@ public class CommunicationLayer {
     }
 
     /**
-     * Start a thread that listen for discovery messages sent to a TCP socket; when a new {@link DiscoveryMessage} is
-     * received from this socket a connection with the associated device is established.
+     * Create a client handler for the corresponding real device (identified by the senderUID) and start the main
+     * thread of the client handler
+     *
+     * @param senderUID the senderUID of the device to connect to
+     * @param socket    the socket used to communicate with the device
      */
-    private void startServerListener() {
-        byte[] buffer;
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            while (true) {
-                Socket socket = serverSocket.accept();
-                DataInputStream in = new DataInputStream(socket.getInputStream());
-                int length = in.readInt();
-                buffer = new byte[length];
-                in.read(buffer);
-                DataMessage message = (DataMessage) decodeMessage(buffer, length);
-                upBuffer.add(message);
-                addClient(message.getSenderUID(), socket);
-                System.out.println("Connected with " + socket.getInetAddress().getHostAddress() + " " + message.getSenderUID());
-            }
+    synchronized public void addClient(UUID senderUID, Socket socket) {
+        try {
+            ClientHandler clientHandler = new ClientHandler(senderUID, socket, this);
+            connectedClients.put(senderUID, clientHandler);
+            new Thread(clientHandler).start();
+            if (!isConnected) isConnected = !isConnected;
+            System.out.println("Create client handler with " + socket.getInetAddress().getHostAddress());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -246,7 +251,7 @@ public class CommunicationLayer {
         if (clientHandler != null) {
             if(!clientID.equals(viewManager.getClientUID())){
                 clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(), clientID, message)));
-            } throw new RuntimeException("Trying to send a message to itself");
+            } else throw new RuntimeException("Trying to send a message to itself");
         }
     }
 
@@ -281,7 +286,7 @@ public class CommunicationLayer {
             try {
                 DatagramPacket packet = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(BROADCAST_ADDR), port);
                 broadcastSocket.send(packet);
-                System.out.println("Broadcast message sent: " + message);
+                System.out.println("Broadcast message sent");
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -295,7 +300,9 @@ public class CommunicationLayer {
      */
     public BasicMessage getMessage() {
         try {
-            return upBuffer.take();
+            BasicMessage message = upBuffer.take();
+            System.out.println("Message taken");
+            return message;
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }

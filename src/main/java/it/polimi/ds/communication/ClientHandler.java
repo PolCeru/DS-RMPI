@@ -78,7 +78,9 @@ public class ClientHandler implements Runnable {
                 payload = new byte[length];
                 inputStream.read(payload);
                 DataMessage message = CommunicationLayer.gson.fromJson(new String(payload, StandardCharsets.UTF_8), DataMessage.class);
-                messageHandler.getUpBuffer().add(message);
+                System.out.println(messageHandler.getUpBuffer().offer(message));
+                System.out.println("Message added to the queue");
+                System.out.println(messageHandler.getUpBuffer().element());
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

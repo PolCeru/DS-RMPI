@@ -10,6 +10,7 @@ import it.polimi.ds.vsync.view.message.InitialTopologyMessage;
 import it.polimi.ds.vsync.view.message.ViewManagerMessage;
 
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.*;
 
 public class ViewManager {
@@ -32,6 +33,7 @@ public class ViewManager {
     private Optional<UUID> realViewManager = Optional.empty();
 
     private final List<UUID> connectedHosts = new LinkedList<>();
+    private final List<UUID> waitingHosts = new LinkedList<>();
 
     public ViewManager(VSynchLayer vSynchLayer, ReliabilityLayer reliabilityLayer, CommunicationLayer communicationLayer) {
         this.communicationLayer = communicationLayer;
@@ -47,15 +49,17 @@ public class ViewManager {
      */
     public synchronized void handleNewHost(UUID newHostId, int newHostRandom, InetAddress newHostAddress) {
         // already connected, so discard
-        if (connectedHosts.contains(newHostId) || newHostId.equals(clientUID)) return;
+        if (connectedHosts.contains(newHostId) || waitingHosts.contains(newHostId) || newHostId.equals(clientUID))
+            return;
         // first connection between devices
         if (!isConnected) {
             if (random < newHostRandom) {
+                waitingHosts.add(newHostId);
                 communicationLayer.initConnection(newHostAddress, newHostId);
                 communicationLayer.stopDiscoverySender();
                 reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), new InitialTopologyMessage(clientUID, getCompleteTopology()));
             } else {
-                System.out.println("DiscoveryMessage from " + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
+                System.out.println("New host:" + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
             }
         } else if (realViewManager.isEmpty()) {
             //TODO: handle creation logic and propagation of the view
@@ -75,6 +79,11 @@ public class ViewManager {
      * TODO remove and add proper server functionality
      */
     public void start() {
+        try {
+            System.out.println("Starting host with address " + InetAddress.getLocalHost().getHostAddress() + ", random " + random + " and uuid" + clientUID);
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        }
         communicationLayer.startDiscoverySender(clientUID, random);
     }
 
@@ -110,7 +119,7 @@ public class ViewManager {
     /**
      * Handle what happen when we receive a {@link DiscoveryMessage} over the TCP connection
      *
-     * @param newHostId     the new host UUID
+     * @param newHostId the new host UUID
      */
     public synchronized void handleNewConnection(UUID newHostId) {
         //already connected, so discard

@@ -38,4 +38,8 @@ public class ReliabilityMessage {
     public UUID getMessageID() {
         return messageID;
     }
+
+    public KnowledgeableMessage getPayload() {
+        return payload;
+    }
 }
