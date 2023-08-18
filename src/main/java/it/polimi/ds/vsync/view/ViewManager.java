@@ -136,4 +136,8 @@ public class ViewManager {
     public UUID getClientUID() {
         return clientUID;
     }
+
+    public List<UUID> getConnectedClients() {
+        return connectedHosts;
+    }
 }
