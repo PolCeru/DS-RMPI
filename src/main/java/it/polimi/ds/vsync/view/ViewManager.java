@@ -80,7 +80,8 @@ public class ViewManager {
      */
     public void start() {
         try {
-            System.out.println("Starting host with address " + InetAddress.getLocalHost().getHostAddress() + ", random " + random + " and uuid" + clientUID);
+            System.out.println("Starting host with address " + InetAddress.getLocalHost().getHostAddress() + ", " +
+                    "random " + random + " and uuid " + clientUID);
         } catch (UnknownHostException e) {
             throw new RuntimeException(e);
         }

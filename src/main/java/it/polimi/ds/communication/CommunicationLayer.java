@@ -250,14 +250,15 @@ public class CommunicationLayer {
      * Send a message to a specific client, used to send an ACK message after a DATA message or to resend a DATA message
      * to a specific client.
      *
-     * @param clientID the client to which the message is sent
+     * @param destinationClientID the client to which the message is sent
      * @param message  the message to be sent
      */
-    synchronized public void sendMessage(UUID clientID, ReliabilityMessage message) {
-        ClientHandler clientHandler = connectedClients.get(clientID);
+    synchronized public void sendMessage(UUID destinationClientID, ReliabilityMessage message) {
+        ClientHandler clientHandler = connectedClients.get(destinationClientID);
         if (clientHandler != null) {
-            if(!clientID.equals(viewManager.getClientUID()))
-                clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(), clientID, message)));
+            if(!destinationClientID.equals(viewManager.getClientUID()))
+                clientHandler.sendMessage(encodeMessage(new DataMessage(LocalDateTime.now(),
+                        viewManager.getClientUID(), message)));
         }
     }
 
@@ -307,7 +308,7 @@ public class CommunicationLayer {
     public BasicMessage getMessage() {
         try {
             BasicMessage message = upBuffer.take();
-            System.out.println("Message taken");
+            System.out.println("Message taken from the upBuffer of the Communication Layer");
             return message;
         } catch (InterruptedException e) {
             throw new RuntimeException(e);

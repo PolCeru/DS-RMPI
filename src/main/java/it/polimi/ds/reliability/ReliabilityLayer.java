@@ -20,6 +20,11 @@ public class ReliabilityLayer {
     private final int MAX_RETRIES = 2;
 
     /**
+     * Timeout before resending a message
+     */
+    int TIMEOUT_RESEND = 10000;
+
+    /**
      * The communication layer to use to send and receive messages
      */
     private CommunicationLayer handler;
@@ -35,7 +40,7 @@ public class ReliabilityLayer {
     private final HashMap<ReliabilityMessage, Integer> retries = new HashMap<>();
 
     /**
-     * Buffer of messages to be sent to the upper VSynch layer
+     * Buffer of messages to be sent to the upper VSync layer
      */
     private final BlockingQueue<ReliabilityMessage> upBuffer = new LinkedBlockingQueue<>();
 
@@ -63,7 +68,8 @@ public class ReliabilityLayer {
             DataMessage dataMessage = (DataMessage) handler.getMessage();
             UUID senderUID = dataMessage.getSenderUID();
             ReliabilityMessage messageReceived = dataMessage.getPayload();
-            System.out.println("Received message " + messageReceived.getMessageType());
+            System.out.println("Received " + messageReceived.getMessageType() + " message with ID " +
+                    messageReceived.getMessageID() + " from " + senderUID);
 
             if (messageReceived.getMessageType() == MessageType.ACK) {
                 //gets the referencedMessage, which is the message that matches message.getReferenceMessageID()
@@ -91,8 +97,11 @@ public class ReliabilityLayer {
             else if (messageReceived.getMessageType() == MessageType.DATA) {
                 //TODO: Creare ackmap che tiene conto anche degli ack ricevuti dagli altri client e sistemare il
                 // passaggio di nuovi messaggi alla vsync layer
-                ReliabilityMessage ackMessage = new ReliabilityMessage(UUID.randomUUID(), messageReceived.getMessageID());
+                UUID ackMessageUID = UUID.randomUUID();
+                ReliabilityMessage ackMessage = new ReliabilityMessage(ackMessageUID, messageReceived.getMessageID());
                 handler.sendMessage(senderUID, ackMessage);
+                System.out.println("Sent ACK for message " + messageReceived.getMessageID() + " with id "
+                        + ackMessageUID + " to " + senderUID);
 
                 if (messageReceived.getPayload().knowledgeableMessageType == KnowledgeableMessageType.VIEW) {
                     System.out.println("View message received");
@@ -103,7 +112,7 @@ public class ReliabilityLayer {
     }
 
     /**
-     * Gets a message from the upper VSynch layer and sends it to every client connected, simulating a broadcast
+     * Gets a message from the upper VSync layer and sends it to every client connected, simulating a broadcast
      * Waits for the acks to be received and resends the message if necessary.
      * If the message is not acknowledged after MAX_RETRIES the client is considered disconnected
      * and the communication layer is notified.
@@ -113,7 +122,6 @@ public class ReliabilityLayer {
         try {
             ReliabilityMessage message = downBuffer.take();
             HashMap<UUID, Boolean> singleAck = new HashMap<>();
-            int TIMEOUT_RESEND = 10000;
 
             handler.sendMessageBroadcast(message);
             //Init ack map for this message
@@ -140,7 +148,7 @@ public class ReliabilityLayer {
                             } else handler.disconnectClient(UUID);
                     });
                 }
-            }, 0, TIMEOUT_RESEND);
+            }, 500, TIMEOUT_RESEND);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -164,7 +172,7 @@ public class ReliabilityLayer {
         destinations.forEach(uuid -> map.put(uuid, Boolean.FALSE));
         for (UUID destination : destinations) {
             ackMap.put(messageToSend, map);
-            System.out.println("Send message " + message.messageType + " to " + destination);
+            System.out.println("Sent message " + message.messageType + " to " + destination);
             handler.sendMessage(destination, messageToSend);
             timer.scheduleAtFixedRate(new TimerTask() {
                 @Override
@@ -180,7 +188,7 @@ public class ReliabilityLayer {
                             } else handler.disconnectClient(UUID);
                     });
                 }
-            }, 0, 5000);
+            }, 500, TIMEOUT_RESEND);
         }
     }
 
