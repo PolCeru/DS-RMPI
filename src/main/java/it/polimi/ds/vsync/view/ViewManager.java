@@ -33,6 +33,7 @@ public class ViewManager {
     private Optional<UUID> realViewManager = Optional.empty();
 
     private final List<UUID> connectedHosts = new LinkedList<>();
+    private final List<UUID> waitingHosts = new LinkedList<>();
 
     public ViewManager(VSynchLayer vSynchLayer, ReliabilityLayer reliabilityLayer, CommunicationLayer communicationLayer) {
         this.communicationLayer = communicationLayer;
@@ -48,10 +49,12 @@ public class ViewManager {
      */
     public synchronized void handleNewHost(UUID newHostId, int newHostRandom, InetAddress newHostAddress) {
         // already connected, so discard
-        if (connectedHosts.contains(newHostId) || newHostId.equals(clientUID)) return;
+        if (connectedHosts.contains(newHostId) || waitingHosts.contains(newHostId) || newHostId.equals(clientUID))
+            return;
         // first connection between devices
         if (!isConnected) {
             if (random < newHostRandom) {
+                waitingHosts.add(newHostId);
                 communicationLayer.initConnection(newHostAddress, newHostId);
                 communicationLayer.stopDiscoverySender();
                 reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), new InitialTopologyMessage(clientUID, getCompleteTopology()));
@@ -116,7 +119,7 @@ public class ViewManager {
     /**
      * Handle what happen when we receive a {@link DiscoveryMessage} over the TCP connection
      *
-     * @param newHostId     the new host UUID
+     * @param newHostId the new host UUID
      */
     public synchronized void handleNewConnection(UUID newHostId) {
         //already connected, so discard

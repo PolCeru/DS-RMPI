@@ -2,6 +2,7 @@ package it.polimi.ds.reliability;
 
 import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.DataMessage;
+import it.polimi.ds.vsync.KnowledgeableMessageType;
 import it.polimi.ds.vsync.VSyncMessage;
 import it.polimi.ds.vsync.view.ViewManager;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
@@ -57,6 +58,7 @@ public class ReliabilityLayer {
             DataMessage dataMessage = (DataMessage) handler.getMessage();
             UUID senderUID = dataMessage.getSenderUID();
             ReliabilityMessage messageReceived = dataMessage.getPayload();
+            System.out.println("Received message " + messageReceived.getMessageType());
 
             if (messageReceived.getMessageType() == MessageType.ACK) {
                 //gets the referencedMessage, which is the message that matches message.getReferenceMessageID()
@@ -84,6 +86,11 @@ public class ReliabilityLayer {
             else if (messageReceived.getMessageType() == MessageType.DATA) {
                 ReliabilityMessage ackMessage = new ReliabilityMessage(UUID.randomUUID(), messageReceived.getMessageID());
                 handler.sendMessage(senderUID, ackMessage);
+
+                if (messageReceived.getPayload().knowledgeableMessageType == KnowledgeableMessageType.VIEW) {
+                    System.out.println("View message received");
+                    viewManager.handleViewMessage((ViewManagerMessage) messageReceived.getPayload());
+                }
             }
         }
     }
