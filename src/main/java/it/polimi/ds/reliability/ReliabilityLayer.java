@@ -87,9 +87,9 @@ public class ReliabilityLayer {
                 ackMap.get(referencedMessage).put(senderUID, true);
 
                 //if all clients have acknowledged the message, remove it from the ackMap
-                if (ackMap.get(messageReceived).values().stream().allMatch(b -> b)) {
-                    ackMap.remove(messageReceived);
-                    upBuffer.add(messageReceived);
+                if (ackMap.get(referencedMessage).values().stream().allMatch(b -> b)) {
+                    ackMap.remove(referencedMessage);
+                    upBuffer.add(referencedMessage);
                 }
             }
             //TODO: handle logic if an ack arrives while ackMap is already true -> discard the ack
