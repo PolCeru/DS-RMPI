@@ -143,14 +143,14 @@ public class ReliabilityLayer {
      * @param message the message to be sent
      */
     public void sendMessage(VSyncMessage message) {
-        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message);
+        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message, );
         downBuffer.add(messageToSend);
         sendMessageBroadcast();
     }
 
     public void sendViewMessage(List<UUID> destinations, ViewManagerMessage message) {
         Timer timer = new Timer();
-        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message);
+        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message, );
         internalBuffer.put(messageToSend.getMessageID(), messageToSend);
         HashMap<UUID, Boolean> map = new HashMap<>();
         destinations.forEach(uuid -> map.put(uuid, Boolean.FALSE));

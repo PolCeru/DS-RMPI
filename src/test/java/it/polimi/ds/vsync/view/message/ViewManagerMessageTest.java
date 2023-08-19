@@ -77,7 +77,7 @@ public class ViewManagerMessageTest {
         void testEncodingInitialTopology() {
             CommunicationLayer communicationLayer = CommunicationLayer.defaultConfiguration(new ViewManagerBuilder(null));
             InitialTopologyMessage initialTopologyMessage = new InitialTopologyMessage(null, null);
-            ReliabilityMessage reliabilityMessage = new ReliabilityMessage(null, initialTopologyMessage);
+            ReliabilityMessage reliabilityMessage = new ReliabilityMessage(null, initialTopologyMessage, );
             DataMessage dataMessage = new DataMessage(LocalDateTime.now(), null, reliabilityMessage);
             try {
                 Method encodeMethod = CommunicationLayer.class.getDeclaredMethod("encodeMessage", BasicMessage.class);
