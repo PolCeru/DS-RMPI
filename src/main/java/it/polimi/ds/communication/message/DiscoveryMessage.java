@@ -9,8 +9,7 @@ import java.util.UUID;
  * to join the network. The message contains a random number that is used to identify the sender.
  */
 public class DiscoveryMessage extends BasicMessage {
-
-    final int random;
+    public final int random;
 
     public DiscoveryMessage(LocalDateTime timestamp, UUID senderUID, int random) {
         super(timestamp, senderUID, MessageType.DISCOVERY);
@@ -21,6 +20,4 @@ public class DiscoveryMessage extends BasicMessage {
         super(timestamp, senderUID, MessageType.DISCOVERY);
         this.random = new Random().nextInt();
     }
-
-    public int getRandom() {return random;}
 }

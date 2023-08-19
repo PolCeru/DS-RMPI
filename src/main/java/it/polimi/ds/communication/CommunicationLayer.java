@@ -197,7 +197,7 @@ public class CommunicationLayer {
                 in.read(buffer);
                 DataMessage message = (DataMessage) decodeMessage(buffer, length);
                 upBuffer.add(message);
-                addClient(message.getSenderUID(), socket);
+                addClient(message.senderUID, socket);
                 System.out.println("Received connection with " + socket.getInetAddress().getHostAddress());
             }
         } catch (IOException e) {
@@ -219,7 +219,7 @@ public class CommunicationLayer {
                 DatagramPacket packet = new DatagramPacket(receiveData, receiveData.length);
                 datagramSocket.receive(packet);
                 DiscoveryMessage message = (DiscoveryMessage) decodeMessage(packet.getData(), packet.getLength());
-                viewManager.handleNewHost(message.getSenderUID(), message.getRandom(), packet.getAddress());
+                viewManager.handleNewHost(message.senderUID, message.random, packet.getAddress());
             }
         } catch (IOException e) {
             throw new RuntimeException(e);

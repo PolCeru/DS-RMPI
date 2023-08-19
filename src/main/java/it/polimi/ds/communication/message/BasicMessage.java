@@ -9,26 +9,14 @@ import java.util.UUID;
  * From BasicMessage are derived AckMessage, DataMessage and DiscoveryMessage.
  */
 public abstract class BasicMessage {
-    private final LocalDateTime timestamp;
-    private final UUID senderUID;
-    private final MessageType messageType;
+    public final LocalDateTime timestamp;
+    public final UUID senderUID;
+    public final MessageType messageType;
 
     protected BasicMessage(LocalDateTime timestamp, UUID senderUID, MessageType messageType) {
         this.timestamp = timestamp;
         this.senderUID = senderUID;
         this.messageType = messageType;
-    }
-
-    public MessageType getMessageType() {
-        return messageType;
-    }
-
-    public UUID getSenderUID() {
-        return senderUID;
-    }
-
-    public LocalDateTime getTimestamp() {
-        return timestamp;
     }
 
     private static boolean compareDate(LocalDateTime t1, LocalDateTime t2) {

@@ -28,7 +28,12 @@ public class ViewManager {
     private final CommunicationLayer communicationLayer;
 
     private final ReliabilityLayer reliabilityLayer;
+
     private boolean isConnected = false;
+
+    private int processID;
+
+    private int clientsProcessIDCounter;
 
     private Optional<UUID> realViewManager = Optional.empty();
 
@@ -36,6 +41,7 @@ public class ViewManager {
     private int contConnectedHost = 0;
 
     private final List<UUID> connectedHosts = new LinkedList<>();
+
     private final List<UUID> waitingHosts = new LinkedList<>();
 
     public ViewManager(VSyncLayer vSyncLayer, ReliabilityLayer reliabilityLayer, CommunicationLayer communicationLayer) {
@@ -57,17 +63,25 @@ public class ViewManager {
         // first connection between devices
         if (!isConnected) {
             if (random < newHostRandom) {
+                if (realViewManager.isEmpty()) {
+                    processID = 1;
+                    clientsProcessIDCounter = 1;
+                }
                 waitingHosts.add(newHostId);
                 communicationLayer.initConnection(newHostAddress, newHostId);
                 communicationLayer.stopDiscoverySender();
-                reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), new InitialTopologyMessage(clientUID, getCompleteTopology()));
+                reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId),
+                        new InitialTopologyMessage(clientUID, clientsProcessIDCounter++, getCompleteTopology()));
             } else {
                 System.out.println("New host:" + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
             }
         } else if (realViewManager.isEmpty()) {
             //TODO: handle creation logic and propagation of the view
+            processID++;
+            clientsProcessIDCounter++;
         } else {
-            reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new AdvertiseMessage(newHostAddress, newHostId));
+            reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new AdvertiseMessage(newHostAddress,
+                    newHostId));
         }
     }
 
@@ -142,5 +156,9 @@ public class ViewManager {
 
     public List<UUID> getConnectedClients() {
         return connectedHosts;
+    }
+
+    public int getProcessID() {
+        return processID;
     }
 }

@@ -5,13 +5,13 @@ import it.polimi.ds.vsync.KnowledgeableMessage;
 import java.util.UUID;
 
 public class ReliabilityMessage implements Comparable<ReliabilityMessage> {
-    private final KnowledgeableMessage payload;
+    public final KnowledgeableMessage payload;
 
-    private final UUID messageID;
+    public final UUID messageID;
 
-    private final UUID referenceMessageID;
+    public final UUID referenceMessageID;
 
-    private final MessageType messageType;
+    public final MessageType messageType;
 
     public final ScalarClock timestamp;
 
