@@ -12,6 +12,7 @@ public class AcknowledgeMap {
 
     public void sendMessage(UUID messageId, List<UUID> recipients) {
         ackMap.put(messageId, MessageState.ofMessage(recipients));
+        System.out.println("Ackmap created, id " + messageId);
     }
 
     public void receiveMessage(UUID messageId, List<UUID> recipients) {
@@ -40,11 +41,13 @@ public class AcknowledgeMap {
     }
 
     public List<UUID> missingAcks(UUID messageId) {
+        System.out.println("Missing ack received id " + messageId);
         MessageState state = ackMap.get(messageId);
         return state.ackMap.entrySet().stream().filter(entry -> entry.getValue().equals(Boolean.FALSE)).map(Map.Entry::getKey).toList();
     }
 
     public void remove(UUID messageId) {
+        System.out.println("Removed message id " + messageId);
         ackMap.remove(messageId);
     }
 
