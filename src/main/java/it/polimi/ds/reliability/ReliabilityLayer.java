@@ -68,13 +68,13 @@ public class ReliabilityLayer {
         }
         while (handler.isConnected()) {
             DataMessage dataMessage = (DataMessage) handler.getMessage();
-            UUID senderUID = dataMessage.getSenderUID();
-            ReliabilityMessage messageReceived = dataMessage.getPayload();
-            System.out.println("Received " + messageReceived.getMessageType() + " message with ID " +
-                    messageReceived.getMessageID() + " from " + senderUID);
+            UUID senderUID = dataMessage.senderUID;
+            ReliabilityMessage messageReceived = dataMessage.payload;
+            System.out.println("Received " + messageReceived.messageType + " message with ID " +
+                    messageReceived.messageID + " from " + senderUID);
 
-            if (messageReceived.getMessageType() == MessageType.ACK) {
-                UUID referencedMessageId = messageReceived.getReferenceMessageID();
+            if (messageReceived.messageType == MessageType.ACK) {
+                UUID referencedMessageId = messageReceived.referenceMessageID;
                 ackMap.receiveAck(referencedMessageId, senderUID, viewManager.getConnectedClients());
 
                 //if all clients have acknowledged the message, remove it from the ackMap
@@ -85,17 +85,17 @@ public class ReliabilityLayer {
             }
             //TODO: handle logic if an ack arrives while ackMap is already true -> discard the ack
             // if(ackMap.get(referencedMessage).get(senderUID))
-            else if (messageReceived.getMessageType() == MessageType.DATA) {
-                ackMap.receiveMessage(messageReceived.getMessageID(), viewManager.getConnectedClients());
+            else if (messageReceived.messageType == MessageType.DATA) {
+                ackMap.receiveMessage(messageReceived.messageID, viewManager.getConnectedClients());
                 UUID ackMessageUID = UUID.randomUUID();
-                ReliabilityMessage ackMessage = new ReliabilityMessage(ackMessageUID, messageReceived.getMessageID());
+                ReliabilityMessage ackMessage = new ReliabilityMessage(ackMessageUID, messageReceived.messageID);
                 handler.sendMessageBroadcast(ackMessage);
-                System.out.println("Sent ACK for message " + messageReceived.getMessageID() + " with id "
+                System.out.println("Sent ACK for message " + messageReceived.messageID + " with id "
                         + ackMessageUID + " to " + senderUID);
 
-                if (messageReceived.getPayload().knowledgeableMessageType == KnowledgeableMessageType.VIEW) {
+                if (messageReceived.payload.knowledgeableMessageType == KnowledgeableMessageType.VIEW) {
                     System.out.println("View message received");
-                    viewManager.handleViewMessage((ViewManagerMessage) messageReceived.getPayload());
+                    viewManager.handleViewMessage((ViewManagerMessage) messageReceived.payload);
                 }
             }
         }
@@ -111,13 +111,13 @@ public class ReliabilityLayer {
         Timer timer = new Timer();
         try {
             ReliabilityMessage message = downBuffer.take();
-            internalBuffer.put(message.getMessageID(), message);
+            internalBuffer.put(message.messageID, message);
             handler.sendMessageBroadcast(message);
-            ackMap.sendMessage(message.getMessageID(), viewManager.getConnectedClients());
+            ackMap.sendMessage(message.messageID, viewManager.getConnectedClients());
             timer.scheduleAtFixedRate(new TimerTask() {
                 @Override
                 public void run() {
-                    ackMap.missingAcks(message.getMessageID()).forEach((id) -> {
+                    ackMap.missingAcks(message.messageID).forEach((id) -> {
                         //If the message is not acknowledged
                         //and is not in the retries map, add it and send it again
                         //otherwise check if the number of retries is less than MAX_RETRIES
@@ -152,17 +152,17 @@ public class ReliabilityLayer {
     public void sendViewMessage(List<UUID> destinations, ViewManagerMessage message) {
         Timer timer = new Timer();
         ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message);
-        internalBuffer.put(messageToSend.getMessageID(), messageToSend);
+        internalBuffer.put(messageToSend.messageID, messageToSend);
         HashMap<UUID, Boolean> map = new HashMap<>();
         destinations.forEach(uuid -> map.put(uuid, Boolean.FALSE));
-        ackMap.sendMessage(messageToSend.getMessageID(), destinations);
+        ackMap.sendMessage(messageToSend.messageID, destinations);
         for (UUID destination : destinations) {
             System.out.println("Sent message " + message.messageType + " to " + destination);
             handler.sendMessage(destination, messageToSend);
             timer.scheduleAtFixedRate(new TimerTask() {
                 @Override
                 public void run() {
-                    ackMap.missingAcks(messageToSend.getMessageID()).forEach(id -> {
+                    ackMap.missingAcks(messageToSend.messageID).forEach(id -> {
                         if (!retries.containsKey(messageToSend)) {
                             retries.put(messageToSend, 1);
                             handler.sendMessage(id, messageToSend);

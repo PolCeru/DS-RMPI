@@ -28,11 +28,13 @@ public class ViewManager {
     private final CommunicationLayer communicationLayer;
 
     private final ReliabilityLayer reliabilityLayer;
+
     private boolean isConnected = false;
 
     private Optional<UUID> realViewManager = Optional.empty();
 
     private final List<UUID> connectedHosts = new LinkedList<>();
+
     private final List<UUID> waitingHosts = new LinkedList<>();
 
     public ViewManager(VSyncLayer vSyncLayer, ReliabilityLayer reliabilityLayer, CommunicationLayer communicationLayer) {
