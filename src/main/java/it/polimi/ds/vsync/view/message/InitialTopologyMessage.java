@@ -6,13 +6,14 @@ import java.util.UUID;
 
 public class InitialTopologyMessage extends ViewManagerMessage {
     public final List<UUID> topology;
-
     public final UUID viewManagerId;
+    public final int destinationProcessID;
 
-    public InitialTopologyMessage(UUID viewManagerId, List<UUID> topology) {
+    public InitialTopologyMessage(UUID viewManagerId, int destinationProcessID, List<UUID> topology) {
         super(ViewChangeType.INIT_VIEW);
         this.viewManagerId = viewManagerId;
         this.topology = topology;
+        this.destinationProcessID = destinationProcessID;
     }
 
     public List<UUID> getTopology() {

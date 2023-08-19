@@ -51,6 +51,8 @@ public class ReliabilityLayer {
      */
     private final BlockingQueue<ReliabilityMessage> downBuffer = new LinkedBlockingQueue<>();
 
+    private int eventID = 0;
+
     private final ViewManager viewManager;
 
     public ReliabilityLayer(ViewManagerBuilder managerBuilder) {
@@ -73,6 +75,10 @@ public class ReliabilityLayer {
             System.out.println("Received " + messageReceived.messageType + " message with ID " +
                     messageReceived.messageID + " from " + senderUID);
 
+            //Checks which scalar clock is higher and updates the eventID
+            ScalarClock timestamp = new ScalarClock(viewManager.getProcessID(),
+                    (Math.max(messageReceived.timestamp.eventID(), eventID)) + 1);
+
             if (messageReceived.messageType == MessageType.ACK) {
                 UUID referencedMessageId = messageReceived.referenceMessageID;
                 ackMap.receiveAck(referencedMessageId, senderUID, viewManager.getConnectedClients());
@@ -81,13 +87,12 @@ public class ReliabilityLayer {
                 if (ackMap.isComplete(referencedMessageId)) {
                     upBuffer.add(internalBuffer.remove(referencedMessageId));
                 }
-            }
-            //TODO: handle logic if an ack arrives while ackMap is already true -> discard the ack
-            // if(ackMap.get(referencedMessage).get(senderUID))
-            else if (messageReceived.messageType == MessageType.DATA) {
+            } else if (messageReceived.messageType == MessageType.DATA) {
+                //timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
                 ackMap.receiveMessage(messageReceived.messageID, viewManager.getConnectedClients());
                 UUID ackMessageUID = UUID.randomUUID();
-                ReliabilityMessage ackMessage = new ReliabilityMessage(ackMessageUID, messageReceived.messageID);
+                ReliabilityMessage ackMessage = new ReliabilityMessage(ackMessageUID, messageReceived.messageID,
+                        timestamp);
                 handler.sendMessageBroadcast(ackMessage);
                 System.out.println("Sent ACK for message " + messageReceived.messageID + " with id "
                         + ackMessageUID + " to " + senderUID);
@@ -131,7 +136,7 @@ public class ReliabilityLayer {
                         //TODO disconnect: handle here the case
                     });
                 }
-            }, 500, TIMEOUT_RESEND);
+            }, 100, TIMEOUT_RESEND);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -143,14 +148,16 @@ public class ReliabilityLayer {
      * @param message the message to be sent
      */
     public void sendMessage(VSyncMessage message) {
-        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message, );
+        ScalarClock timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
+        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message, timestamp);
         downBuffer.add(messageToSend);
         sendMessageBroadcast();
     }
 
     public void sendViewMessage(List<UUID> destinations, ViewManagerMessage message) {
         Timer timer = new Timer();
-        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message, );
+        ScalarClock timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
+        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message, timestamp);
         internalBuffer.put(messageToSend.messageID, messageToSend);
         HashMap<UUID, Boolean> map = new HashMap<>();
         destinations.forEach(uuid -> map.put(uuid, Boolean.FALSE));
@@ -161,9 +168,9 @@ public class ReliabilityLayer {
             timer.scheduleAtFixedRate(new TimerTask() {
                 @Override
                 public void run() {
-                    List<UUID> list = ackMap.missingAcks(messageToSend.getMessageID());
+                    List<UUID> list = ackMap.missingAcks(messageToSend.messageID);
                     if (list.isEmpty()) {
-                        ackMap.remove(messageToSend.getMessageID());
+                        ackMap.remove(messageToSend.messageID);
                         timer.cancel();
                     } else {
                         list.forEach(id -> {
@@ -177,7 +184,7 @@ public class ReliabilityLayer {
                         });
                     }
                 }
-            }, 500, TIMEOUT_RESEND);
+            }, 100, TIMEOUT_RESEND);
         }
     }
 

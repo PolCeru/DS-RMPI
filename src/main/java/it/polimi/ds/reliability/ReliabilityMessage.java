@@ -1,6 +1,5 @@
 package it.polimi.ds.reliability;
 
-import it.polimi.ds.utils.ScalarClock;
 import it.polimi.ds.vsync.KnowledgeableMessage;
 
 import java.util.UUID;
