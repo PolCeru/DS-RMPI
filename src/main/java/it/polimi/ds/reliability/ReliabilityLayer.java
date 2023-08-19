@@ -79,7 +79,6 @@ public class ReliabilityLayer {
 
                 //if all clients have acknowledged the message, remove it from the ackMap
                 if (ackMap.isComplete(referencedMessageId)) {
-                    ackMap.remove(referencedMessageId);
                     upBuffer.add(internalBuffer.remove(referencedMessageId));
                 }
             }
@@ -88,7 +87,7 @@ public class ReliabilityLayer {
             else if (messageReceived.getMessageType() == MessageType.DATA) {
                 ackMap.receiveMessage(messageReceived.getMessageID(), viewManager.getConnectedClients());
                 UUID ackMessageUID = UUID.randomUUID();
-                ReliabilityMessage ackMessage = new ReliabilityMessage(ackMessageUID, messageReceived.getMessageID());
+                ReliabilityMessage ackMessage = new ReliabilityMessage(ackMessageUID, messageReceived.getMessageID(), );
                 handler.sendMessageBroadcast(ackMessage);
                 System.out.println("Sent ACK for message " + messageReceived.getMessageID() + " with id "
                         + ackMessageUID + " to " + senderUID);
@@ -162,15 +161,21 @@ public class ReliabilityLayer {
             timer.scheduleAtFixedRate(new TimerTask() {
                 @Override
                 public void run() {
-                    ackMap.missingAcks(messageToSend.getMessageID()).forEach(id -> {
-                        if (!retries.containsKey(messageToSend)) {
-                            retries.put(messageToSend, 1);
-                            handler.sendMessage(id, messageToSend);
-                        } else if (retries.get(messageToSend) <= MAX_RETRIES) {
-                            retries.put(messageToSend, retries.get(messageToSend) + 1);
-                            handler.sendMessage(id, messageToSend);
-                        } else handler.disconnectClient(id);
-                    });
+                    List<UUID> list = ackMap.missingAcks(messageToSend.getMessageID());
+                    if (list.isEmpty()) {
+                        ackMap.remove(messageToSend.getMessageID());
+                        timer.cancel();
+                    } else {
+                        list.forEach(id -> {
+                            if (!retries.containsKey(messageToSend)) {
+                                retries.put(messageToSend, 1);
+                                handler.sendMessage(id, messageToSend);
+                            } else if (retries.get(messageToSend) <= MAX_RETRIES) {
+                                retries.put(messageToSend, retries.get(messageToSend) + 1);
+                                handler.sendMessage(id, messageToSend);
+                            } else handler.disconnectClient(id);
+                        });
+                    }
                 }
             }, 500, TIMEOUT_RESEND);
         }
