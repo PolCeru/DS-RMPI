@@ -37,9 +37,6 @@ public class ViewManager {
 
     private Optional<UUID> realViewManager = Optional.empty();
 
-    private int processId;
-    private int contConnectedHost = 0;
-
     private final List<UUID> connectedHosts = new LinkedList<>();
 
     private final List<UUID> waitingHosts = new LinkedList<>();

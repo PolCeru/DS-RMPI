@@ -36,7 +36,7 @@ public class ReliabilityLayerTest {
         CommunicationLayer mockCL = mock(CommunicationLayer.class);
         UUID senderUUID = UUID.randomUUID();
         UUID dataMessageUUID = UUID.randomUUID();
-        ReliabilityMessage dataMessage = new ReliabilityMessage(dataMessageUUID, new VSyncMessage("test".getBytes()), );
+        ReliabilityMessage dataMessage = new ReliabilityMessage(dataMessageUUID, new VSyncMessage("test".getBytes()), new ScalarClock(0, 0));
 
         // stubbing
         when(mockCL.isConnected()).thenReturn(true).thenReturn(false);

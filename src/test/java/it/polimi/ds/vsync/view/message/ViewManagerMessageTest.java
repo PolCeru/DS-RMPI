@@ -5,6 +5,7 @@ import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.BasicMessage;
 import it.polimi.ds.communication.message.DataMessage;
 import it.polimi.ds.reliability.ReliabilityMessage;
+import it.polimi.ds.reliability.ScalarClock;
 import it.polimi.ds.utils.MessageGsonBuilder;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
 import org.junit.jupiter.api.DisplayName;
@@ -29,7 +30,7 @@ public class ViewManagerMessageTest {
         @DisplayName("Serialization of initial topology message with empty view")
         void EmptyTopologySerialization() {
             Gson gson = new MessageGsonBuilder().registerViewMessageAdapter().registerKnowledgeableMessage().create();
-            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), new ArrayList<>());
+            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), 0, new ArrayList<>());
             String json = gson.toJson(message);
             System.out.println(json);
         }
@@ -41,7 +42,7 @@ public class ViewManagerMessageTest {
             ArrayList<UUID> topology = new ArrayList<>();
             topology.add(UUID.randomUUID());
             topology.add(UUID.randomUUID());
-            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), topology);
+            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), 0, topology);
             String json = gson.toJson(message);
             System.out.println(json);
         }
@@ -50,7 +51,7 @@ public class ViewManagerMessageTest {
         @DisplayName("Deserialization of initial topology message with empty view")
         void EmptyTopologyDeSerialization() {
             Gson gson = new MessageGsonBuilder().registerViewMessageAdapter().registerKnowledgeableMessage().create();
-            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), new ArrayList<>());
+            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), 0, new ArrayList<>());
             String json = gson.toJson(message);
             InitialTopologyMessage deserializedMessage = (InitialTopologyMessage) gson.fromJson(json, ViewManagerMessage.class);
             assertEquals(message, deserializedMessage);
@@ -63,7 +64,7 @@ public class ViewManagerMessageTest {
             ArrayList<UUID> topology = new ArrayList<>();
             topology.add(UUID.randomUUID());
             topology.add(UUID.randomUUID());
-            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), topology);
+            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), 0, topology);
             String json = gson.toJson(message);
             InitialTopologyMessage deserializedMessage = (InitialTopologyMessage) gson.fromJson(json, ViewManagerMessage.class);
             assertEquals(message, deserializedMessage);
@@ -76,8 +77,8 @@ public class ViewManagerMessageTest {
         @Test
         void testEncodingInitialTopology() {
             CommunicationLayer communicationLayer = CommunicationLayer.defaultConfiguration(new ViewManagerBuilder(null));
-            InitialTopologyMessage initialTopologyMessage = new InitialTopologyMessage(null, null);
-            ReliabilityMessage reliabilityMessage = new ReliabilityMessage(null, initialTopologyMessage, );
+            InitialTopologyMessage initialTopologyMessage = new InitialTopologyMessage(null, 0, null);
+            ReliabilityMessage reliabilityMessage = new ReliabilityMessage(null, initialTopologyMessage, new ScalarClock(0, 0));
             DataMessage dataMessage = new DataMessage(LocalDateTime.now(), null, reliabilityMessage);
             try {
                 Method encodeMethod = CommunicationLayer.class.getDeclaredMethod("encodeMessage", BasicMessage.class);
@@ -98,7 +99,7 @@ public class ViewManagerMessageTest {
                 Method decodeMethod = CommunicationLayer.class.getDeclaredMethod("decodeMessage", byte[].class, int.class);
                 decodeMethod.setAccessible(true);
                 DataMessage message = (DataMessage) decodeMethod.invoke(communicationLayer, buffer, buffer.length);
-                assertInstanceOf(InitialTopologyMessage.class, message.getPayload().getPayload());
+                assertInstanceOf(InitialTopologyMessage.class, message.payload.getPayload());
             } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
                 throw new RuntimeException(e);
             }
