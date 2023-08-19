@@ -4,7 +4,7 @@ import it.polimi.ds.vsync.KnowledgeableMessage;
 
 import java.util.UUID;
 
-public class ReliabilityMessage {
+public class ReliabilityMessage implements Comparable<ReliabilityMessage> {
     private final KnowledgeableMessage payload;
 
     private final UUID messageID;
@@ -45,5 +45,16 @@ public class ReliabilityMessage {
 
     public KnowledgeableMessage getPayload() {
         return payload;
+    }
+
+    @Override
+    public int compareTo(ReliabilityMessage o) {
+        if (this.timestamp.eventId() < o.timestamp.eventId()) {
+            return -1;
+        } else if (this.timestamp.eventId() > o.timestamp.eventId()) {
+            return +1;
+        } else {
+            return Integer.compare(timestamp.processId(), o.timestamp.processId());
+        }
     }
 }
