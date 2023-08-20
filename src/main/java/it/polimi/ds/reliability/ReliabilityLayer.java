@@ -2,6 +2,7 @@ package it.polimi.ds.reliability;
 
 import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.DataMessage;
+import it.polimi.ds.utils.StablePriorityBlockingQueue;
 import it.polimi.ds.vsync.KnowledgeableMessageType;
 import it.polimi.ds.vsync.VSyncMessage;
 import it.polimi.ds.vsync.view.ViewManager;
@@ -11,7 +12,6 @@ import it.polimi.ds.vsync.view.message.ViewManagerMessage;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.PriorityBlockingQueue;
 
 public class ReliabilityLayer {
 
@@ -45,7 +45,7 @@ public class ReliabilityLayer {
     /**
      * Buffer of messages to be sent to the upper VSync layer
      */
-    private final PriorityBlockingQueue<ReliabilityMessage> upBuffer = new PriorityBlockingQueue<>();
+    private final StablePriorityBlockingQueue<ReliabilityMessage> upBuffer = new StablePriorityBlockingQueue<>();
 
     /**
      * Buffer of messages to be sent to the lower Communication layer
@@ -205,7 +205,7 @@ public class ReliabilityLayer {
 
     public ReliabilityMessage getMessage() {
         try {
-            return upBuffer.take();
+            return upBuffer.retrieveStable();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
