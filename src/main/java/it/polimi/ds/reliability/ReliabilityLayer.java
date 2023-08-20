@@ -57,6 +57,8 @@ public class ReliabilityLayer {
 
     private final ViewManager viewManager;
 
+    private boolean messageEnabled = true;
+
     private final FaultRecovery faultRecovery;
 
     public ReliabilityLayer(ViewManagerBuilder managerBuilder, FaultRecovery faultRecovery) {
@@ -64,7 +66,8 @@ public class ReliabilityLayer {
         managerBuilder.setReliabilityLayer(this);
         this.handler = CommunicationLayer.defaultConfiguration(managerBuilder);
         viewManager = managerBuilder.create();
-        new Thread(this::readMessage).start();
+        new Thread(this::readMessage, "ReliabilityLayer::readMessage").start();
+        new Thread(this::sendMessageBroadcast, "ReliabilityLayer::sendMessageBroadcast").start();
     }
 
     private void readMessage() {
@@ -117,15 +120,26 @@ public class ReliabilityLayer {
      * and the communication layer is notified.
      */
     private void sendMessageBroadcast() {
-        try {
-            ReliabilityMessage message = downBuffer.take();
-            upBuffer.add(message);
-            internalBuffer.put(message.messageID, message);
-            handler.sendMessageBroadcast(message);
-            ackMap.sendMessage(message.messageID, viewManager.getConnectedClients());
-            checkDelivery(message);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+        while (true) {
+            synchronized (this) {
+                while (!messageEnabled) {
+                    try {
+                        wait();
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+            try {
+                ReliabilityMessage message = downBuffer.take();
+                upBuffer.add(message);
+                internalBuffer.put(message.messageID, message);
+                handler.sendMessageBroadcast(message);
+                ackMap.sendMessage(message.messageID, viewManager.getConnectedClients());
+                checkDelivery(message);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
@@ -203,5 +217,14 @@ public class ReliabilityLayer {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void stopMessageSending() {
+        messageEnabled = false;
+    }
+
+    public void startMessageSending() {
+        messageEnabled = true;
+        notifyAll();
     }
 }
