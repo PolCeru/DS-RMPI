@@ -181,7 +181,7 @@ public class ReliabilityLayer {
                     });
                 }
             }
-        }, 100, TIMEOUT_RESEND);
+        }, TIMEOUT_RESEND, TIMEOUT_RESEND);
     }
 
     /**
