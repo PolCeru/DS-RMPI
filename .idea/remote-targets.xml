@@ -2,22 +2,50 @@
 <project version="4">
   <component name="RemoteTargetsManager">
     <targets>
-      <target name="java" type="docker-compose" uuid="e83f8dbc-1a00-4775-b743-fc4cfed768b6">
+      <target name="openjdk:latest" type="docker" uuid="46bcc72f-da8a-42bb-8520-23e56be7b2a9">
         <config>
           <option name="targetPlatform">
             <TargetPlatform />
           </option>
-          <option name="configurationFiles">
-            <list>
-              <option value="C:\Users\Bramb\OneDrive\informatica\Projects\JavaProjects\Polimi-DS-RMPI\docker-compose.yaml" />
-            </list>
+          <option name="buildImageConfig">
+            <BuildImageConfig>
+              <option name="dockerFile" value="Dockerfile" />
+            </BuildImageConfig>
           </option>
-          <option name="serviceName" value="java" />
+          <option name="buildNotPull" value="false" />
+          <option name="containerConfig">
+            <ContainerConfig>
+              <option name="runCliOptions" value="--entrypoint= --rm --network javanet" />
+            </ContainerConfig>
+          </option>
+          <option name="pullImageConfig">
+            <PullImageConfig>
+              <option name="tagToPull" value="openjdk:latest" />
+            </PullImageConfig>
+          </option>
         </config>
         <ContributedStateBase type="JavaLanguageRuntime">
           <config>
-            <option name="homePath" value="/usr/local/openjdk-22" />
-            <option name="javaVersionString" value="22-ea" />
+            <option name="agentFolder">
+              <VolumeState>
+                <option name="targetSpecificBits">
+                  <map>
+                    <entry key="mountAsVolume" value="false" />
+                  </map>
+                </option>
+              </VolumeState>
+            </option>
+            <option name="classpathFolder">
+              <VolumeState>
+                <option name="targetSpecificBits">
+                  <map>
+                    <entry key="mountAsVolume" value="false" />
+                  </map>
+                </option>
+              </VolumeState>
+            </option>
+            <option name="homePath" value="/usr/java/openjdk-18" />
+            <option name="javaVersionString" value="18.0.2" />
           </config>
         </ContributedStateBase>
       </target>

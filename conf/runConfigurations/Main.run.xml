@@ -3,7 +3,7 @@
                    nameIsGenerated="true">
         <option name="MAIN_CLASS_NAME" value="it.polimi.ds.Main"/>
         <module name="Polimi-DS-RMPI"/>
-        <target name="java"/>
+        <target name="openjdk:latest"/>
         <extension name="coverage">
             <pattern>
                 <option name="PATTERN" value="it.polimi.ds.*"/>
