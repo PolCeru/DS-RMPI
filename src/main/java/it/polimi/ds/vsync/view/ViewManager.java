@@ -138,6 +138,14 @@ public class ViewManager {
     }
 
     /**
+     * Called by FaultRecovery when the log threshold is reached, stops the sending of messages and starts the
+     * stabilisation phase
+     */
+    public void handleCheckpoint(){
+        //TODO: implement
+    }
+
+    /**
      * Handle what happen when we receive a {@link DiscoveryMessage} over the TCP connection
      *
      * @param newHostId the new host UUID
