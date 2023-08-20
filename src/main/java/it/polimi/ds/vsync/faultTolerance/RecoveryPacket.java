@@ -1,4 +1,7 @@
 package it.polimi.ds.vsync.faultTolerance;
 
-public record RecoveryPacket() {
+import java.util.ArrayList;
+
+public record RecoveryPacket(ArrayList<Checkpoint> checkpoints, ArrayList<Byte[]> log){
+
 }

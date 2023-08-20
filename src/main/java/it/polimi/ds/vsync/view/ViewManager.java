@@ -4,6 +4,7 @@ import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.DiscoveryMessage;
 import it.polimi.ds.reliability.ReliabilityLayer;
 import it.polimi.ds.vsync.VSyncLayer;
+import it.polimi.ds.vsync.faultTolerance.FaultRecovery;
 import it.polimi.ds.vsync.view.message.AdvertiseMessage;
 import it.polimi.ds.vsync.view.message.ConfirmViewChangeMessage;
 import it.polimi.ds.vsync.view.message.InitialTopologyMessage;
@@ -29,6 +30,8 @@ public class ViewManager {
 
     private final ReliabilityLayer reliabilityLayer;
 
+    private final FaultRecovery faultRecovery;
+
     private boolean isConnected = false;
 
     private int processID;
@@ -41,7 +44,9 @@ public class ViewManager {
 
     private final List<UUID> waitingHosts = new LinkedList<>();
 
-    public ViewManager(VSyncLayer vSyncLayer, ReliabilityLayer reliabilityLayer, CommunicationLayer communicationLayer) {
+    public ViewManager(VSyncLayer vSyncLayer, ReliabilityLayer reliabilityLayer,
+                       CommunicationLayer communicationLayer, FaultRecovery faultRecovery){
+        this.faultRecovery = faultRecovery;
         this.communicationLayer = communicationLayer;
         this.reliabilityLayer = reliabilityLayer;
     }
@@ -127,6 +132,7 @@ public class ViewManager {
                 } else {
                     //TODO manage the error or avoid?
                 }
+                //TODO: case RECOVER e RECOVERY_PACKET
             }
         }
     }

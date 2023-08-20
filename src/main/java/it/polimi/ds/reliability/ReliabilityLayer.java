@@ -4,6 +4,7 @@ import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.DataMessage;
 import it.polimi.ds.vsync.KnowledgeableMessageType;
 import it.polimi.ds.vsync.VSyncMessage;
+import it.polimi.ds.vsync.faultTolerance.FaultRecovery;
 import it.polimi.ds.vsync.view.ViewManager;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
 import it.polimi.ds.vsync.view.message.ViewManagerMessage;
@@ -56,7 +57,10 @@ public class ReliabilityLayer {
 
     private final ViewManager viewManager;
 
-    public ReliabilityLayer(ViewManagerBuilder managerBuilder) {
+    private final FaultRecovery faultRecovery;
+
+    public ReliabilityLayer(ViewManagerBuilder managerBuilder, FaultRecovery faultRecovery) {
+        this.faultRecovery = faultRecovery;
         managerBuilder.setReliabilityLayer(this);
         this.handler = CommunicationLayer.defaultConfiguration(managerBuilder);
         viewManager = managerBuilder.create();

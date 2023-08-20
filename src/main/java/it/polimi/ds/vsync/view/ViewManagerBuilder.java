@@ -3,9 +3,12 @@ package it.polimi.ds.vsync.view;
 import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.reliability.ReliabilityLayer;
 import it.polimi.ds.vsync.VSyncLayer;
+import it.polimi.ds.vsync.faultTolerance.FaultRecovery;
 
 public class ViewManagerBuilder {
     final VSyncLayer vSyncLayer;
+
+    final FaultRecovery faultRecovery;
 
     ReliabilityLayer reliabilityLayer = null;
 
@@ -13,7 +16,8 @@ public class ViewManagerBuilder {
 
     ViewManager instance = null;
 
-    public ViewManagerBuilder(VSyncLayer vSyncLayer) {
+    public ViewManagerBuilder(VSyncLayer vSyncLayer, FaultRecovery faultRecovery) {
+        this.faultRecovery = faultRecovery;
         this.vSyncLayer = vSyncLayer;
     }
 
@@ -26,7 +30,7 @@ public class ViewManagerBuilder {
     }
 
     public ViewManager create() {
-        if (instance == null) instance = new ViewManager(vSyncLayer, reliabilityLayer, communicationLayer);
+        if (instance == null) instance = new ViewManager(vSyncLayer, reliabilityLayer, communicationLayer, faultRecovery);
         return instance;
     }
 }
