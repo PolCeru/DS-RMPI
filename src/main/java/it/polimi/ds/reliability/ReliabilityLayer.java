@@ -90,7 +90,7 @@ public class ReliabilityLayer {
 
                 //if all clients have acknowledged the message, remove it from the ackMap
                 if (ackMap.isComplete(referencedMessageId)) {
-                    upBuffer.add(internalBuffer.remove(referencedMessageId));
+                    upBuffer.markStable(internalBuffer.get(referencedMessageId));
                 }
             } else if (messageReceived.messageType == MessageType.DATA) {
                 //timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
@@ -119,6 +119,7 @@ public class ReliabilityLayer {
     private void sendMessageBroadcast() {
         try {
             ReliabilityMessage message = downBuffer.take();
+            upBuffer.add(message);
             internalBuffer.put(message.messageID, message);
             handler.sendMessageBroadcast(message);
             ackMap.sendMessage(message.messageID, viewManager.getConnectedClients());
@@ -144,8 +145,6 @@ public class ReliabilityLayer {
         ScalarClock timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
         ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message, timestamp);
         internalBuffer.put(messageToSend.messageID, messageToSend);
-        HashMap<UUID, Boolean> map = new HashMap<>();
-        destinations.forEach(uuid -> map.put(uuid, Boolean.FALSE));
         ackMap.sendMessage(messageToSend.messageID, destinations);
         for (UUID destination : destinations) {
             System.out.println("Sent message " + message.messageType + " to " + destination);
