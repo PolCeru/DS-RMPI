@@ -5,6 +5,7 @@ import it.polimi.ds.communication.message.DataMessage;
 import it.polimi.ds.utils.StablePriorityBlockingQueue;
 import it.polimi.ds.vsync.KnowledgeableMessageType;
 import it.polimi.ds.vsync.VSyncMessage;
+import it.polimi.ds.vsync.faultTolerance.FaultRecovery;
 import it.polimi.ds.vsync.view.ViewManager;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
 import it.polimi.ds.vsync.view.message.ViewManagerMessage;
@@ -56,7 +57,10 @@ public class ReliabilityLayer {
 
     private final ViewManager viewManager;
 
-    public ReliabilityLayer(ViewManagerBuilder managerBuilder) {
+    private final FaultRecovery faultRecovery;
+
+    public ReliabilityLayer(ViewManagerBuilder managerBuilder, FaultRecovery faultRecovery) {
+        this.faultRecovery = faultRecovery;
         managerBuilder.setReliabilityLayer(this);
         this.handler = CommunicationLayer.defaultConfiguration(managerBuilder);
         viewManager = managerBuilder.create();
@@ -113,31 +117,12 @@ public class ReliabilityLayer {
      * and the communication layer is notified.
      */
     private void sendMessageBroadcast() {
-        Timer timer = new Timer();
         try {
             ReliabilityMessage message = downBuffer.take();
             internalBuffer.put(message.messageID, message);
             handler.sendMessageBroadcast(message);
             ackMap.sendMessage(message.messageID, viewManager.getConnectedClients());
-            timer.scheduleAtFixedRate(new TimerTask() {
-                @Override
-                public void run() {
-                    ackMap.missingAcks(message.messageID).forEach((id) -> {
-                        //If the message is not acknowledged
-                        //and is not in the retries map, add it and send it again
-                        //otherwise check if the number of retries is less than MAX_RETRIES
-                        //and send it again or disconnect the client
-                        if (!retries.containsKey(message)) {
-                            retries.put(message, 1);
-                            handler.sendMessage(id, message);
-                        } else if (retries.get(message) <= MAX_RETRIES) {
-                            retries.put(message, retries.get(message) + 1);
-                            handler.sendMessage(id, message);
-                        } else handler.disconnectClient(id);
-                        //TODO disconnect: handle here the case
-                    });
-                }
-            }, 100, TIMEOUT_RESEND);
+            checkDelivery(message);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -156,7 +141,6 @@ public class ReliabilityLayer {
     }
 
     public void sendViewMessage(List<UUID> destinations, ViewManagerMessage message) {
-        Timer timer = new Timer();
         ScalarClock timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
         ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message, timestamp);
         internalBuffer.put(messageToSend.messageID, messageToSend);
@@ -166,27 +150,38 @@ public class ReliabilityLayer {
         for (UUID destination : destinations) {
             System.out.println("Sent message " + message.messageType + " to " + destination);
             handler.sendMessage(destination, messageToSend);
-            timer.scheduleAtFixedRate(new TimerTask() {
-                @Override
-                public void run() {
-                    List<UUID> list = ackMap.missingAcks(messageToSend.messageID);
-                    if (list.isEmpty()) {
-                        ackMap.remove(messageToSend.messageID);
-                        timer.cancel();
-                    } else {
-                        list.forEach(id -> {
-                            if (!retries.containsKey(messageToSend)) {
-                                retries.put(messageToSend, 1);
-                                handler.sendMessage(id, messageToSend);
-                            } else if (retries.get(messageToSend) <= MAX_RETRIES) {
-                                retries.put(messageToSend, retries.get(messageToSend) + 1);
-                                handler.sendMessage(id, messageToSend);
-                            } else handler.disconnectClient(id);
-                        });
-                    }
-                }
-            }, 100, TIMEOUT_RESEND);
+            checkDelivery(messageToSend);
         }
+    }
+
+    /**
+     * Checks if the message has been acknowledged by all clients, if not resends it
+     *
+     * @param messageToSend the message to be checked
+     */
+    private void checkDelivery(ReliabilityMessage messageToSend) {
+        Timer timer = new Timer();
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                List<UUID> list = ackMap.missingAcks(messageToSend.messageID);
+                if (list.isEmpty()) {
+                    //TODO: log the message in the FaultRecovery class
+                    ackMap.remove(messageToSend.messageID);
+                    timer.cancel();
+                } else {
+                    list.forEach(id -> {
+                        if (!retries.containsKey(messageToSend)) {
+                            retries.put(messageToSend, 1);
+                            handler.sendMessage(id, messageToSend);
+                        } else if (retries.get(messageToSend) <= MAX_RETRIES) {
+                            retries.put(messageToSend, retries.get(messageToSend) + 1);
+                            handler.sendMessage(id, messageToSend);
+                        } else handler.disconnectClient(id);
+                    });
+                }
+            }
+        }, 100, TIMEOUT_RESEND);
     }
 
     /**

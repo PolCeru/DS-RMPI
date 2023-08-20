@@ -5,6 +5,7 @@ import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.DataMessage;
 import it.polimi.ds.vsync.VSyncLayer;
 import it.polimi.ds.vsync.VSyncMessage;
+import it.polimi.ds.vsync.faultTolerance.FaultRecovery;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
 import jdk.jfr.Description;
 import org.junit.jupiter.api.DisplayName;
@@ -29,10 +30,10 @@ public class ReliabilityLayerTest {
     @Test
     @DisplayName("Read DATA Message Test")
     @Description("Tests that the ReliabilityLayer sends an ACK message when it receives a DataMessage")
-    public void testReadDataMessage() {
+    public void readDataMessageTest() {
         // mock creation
         VSyncLayer mockVSL = mock(VSyncLayer.class);
-        ViewManagerBuilder VMB = new ViewManagerBuilder(mockVSL);
+        ViewManagerBuilder VMB = new ViewManagerBuilder(mockVSL, new FaultRecovery(mockVSL));
         CommunicationLayer mockCL = mock(CommunicationLayer.class);
         UUID senderUUID = UUID.randomUUID();
         UUID dataMessageUUID = UUID.randomUUID();
@@ -47,13 +48,13 @@ public class ReliabilityLayerTest {
             ReliabilityMessage passedMessage = invocation.getArgument(1);
             // check that the message is sent to the correct client
             assertEquals(senderUUID, passedClientID);
-            assertEquals(passedMessage.getMessageType(), MessageType.ACK);
-            assertEquals(passedMessage.getReferenceMessageID(), dataMessageUUID);
+            assertEquals(passedMessage.messageType, MessageType.ACK);
+            assertEquals(passedMessage.referenceMessageID, dataMessageUUID);
             return null;
         }).when(mockCL).sendMessage(any(UUID.class), any(ReliabilityMessage.class));
 
         //setup ReliabilityLayer
-        ReliabilityLayer RL = new ReliabilityLayer(VMB);
+        ReliabilityLayer RL = new ReliabilityLayer(VMB, new FaultRecovery(mockVSL));
         RL.setCommunicationLayer(mockCL);
 
         // check that the message is received and an ACK is sent
@@ -66,22 +67,22 @@ public class ReliabilityLayerTest {
     @Test
     @DisplayName("Send DATA Message Test")
     @Description("Tests the sending of a DATA message for each connected client")
-    public void testReadAckMessage() {
+    public void sendDataMessageTest() {
         // mock creation
         VSyncLayer senderMockVSL = mock(VSyncLayer.class);
         VSyncLayer mockVSL = mock(VSyncLayer.class);
         VSyncLayer mockVSL2 = mock(VSyncLayer.class);
-        ViewManagerBuilder senderVMB = new ViewManagerBuilder(senderMockVSL);
-        ViewManagerBuilder VMB = new ViewManagerBuilder(mockVSL);
-        ViewManagerBuilder VMB2 = new ViewManagerBuilder(mockVSL2);
+        ViewManagerBuilder senderVMB = new ViewManagerBuilder(senderMockVSL, new FaultRecovery(senderMockVSL));
+        ViewManagerBuilder VMB = new ViewManagerBuilder(mockVSL, new FaultRecovery(mockVSL));
+        ViewManagerBuilder VMB2 = new ViewManagerBuilder(mockVSL2, new FaultRecovery(mockVSL2));
         CommunicationLayer senderMockCL = mock(CommunicationLayer.class);
         CommunicationLayer mockCL = mock(CommunicationLayer.class);
         CommunicationLayer mockCL2 = mock(CommunicationLayer.class);
 
         //setup ReliabilityLayer
-        ReliabilityLayer senderRL = new ReliabilityLayer(senderVMB);
-        ReliabilityLayer RL = new ReliabilityLayer(VMB);
-        ReliabilityLayer RL2 = new ReliabilityLayer(VMB2);
+        ReliabilityLayer senderRL = new ReliabilityLayer(senderVMB, new FaultRecovery(senderMockVSL));
+        ReliabilityLayer RL = new ReliabilityLayer(VMB, new FaultRecovery(mockVSL));
+        ReliabilityLayer RL2 = new ReliabilityLayer(VMB2, new FaultRecovery(mockVSL2));
         when(senderMockVSL.getHandler()).thenReturn(senderRL);
         when(mockVSL.getHandler()).thenReturn(RL);
         when(mockVSL2.getHandler()).thenReturn(RL2);

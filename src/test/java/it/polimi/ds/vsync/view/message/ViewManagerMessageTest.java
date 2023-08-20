@@ -7,6 +7,7 @@ import it.polimi.ds.communication.message.DataMessage;
 import it.polimi.ds.reliability.ReliabilityMessage;
 import it.polimi.ds.reliability.ScalarClock;
 import it.polimi.ds.utils.MessageGsonBuilder;
+import it.polimi.ds.vsync.faultTolerance.FaultRecovery;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -76,7 +77,8 @@ public class ViewManagerMessageTest {
     class DecodingEncodingTest {
         @Test
         void testEncodingInitialTopology() {
-            CommunicationLayer communicationLayer = CommunicationLayer.defaultConfiguration(new ViewManagerBuilder(null));
+            CommunicationLayer communicationLayer =
+                    CommunicationLayer.defaultConfiguration(new ViewManagerBuilder(null, new FaultRecovery(null)));
             InitialTopologyMessage initialTopologyMessage = new InitialTopologyMessage(null, 0, null);
             ReliabilityMessage reliabilityMessage = new ReliabilityMessage(null, initialTopologyMessage, new ScalarClock(0, 0));
             DataMessage dataMessage = new DataMessage(LocalDateTime.now(), null, reliabilityMessage);
@@ -92,7 +94,8 @@ public class ViewManagerMessageTest {
 
         @Test
         void testDecodingInitialTopology() {
-            CommunicationLayer communicationLayer = CommunicationLayer.defaultConfiguration(new ViewManagerBuilder(null));
+            CommunicationLayer communicationLayer =
+                    CommunicationLayer.defaultConfiguration(new ViewManagerBuilder(null, new FaultRecovery(null)));
             String json = "{\"payload\":{\"payload\":{\"topology\":null,\"viewManagerId\":null,\"messageType\":\"INIT_VIEW\",\"knowledgeableMessageType\":\"VIEW\"},\"messageID\":null,\"referenceMessageID\":null,\"messageType\":\"DATA\"},\"timestamp\":\"1692140967076\",\"senderUID\":null,\"messageType\":\"DATA\"}";
             byte[] buffer = json.getBytes();
             try {
