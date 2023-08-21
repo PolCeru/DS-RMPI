@@ -93,7 +93,8 @@ public class ReliabilityLayer {
 
                 //if all clients have acknowledged the message, remove it from the ackMap
                 if (ackMap.isComplete(referencedMessageId)) {
-                    upBuffer.markStable(internalBuffer.get(referencedMessageId));
+                    ReliabilityMessage message = internalBuffer.remove(referencedMessageId);
+                    if (message != null) upBuffer.markStable(message);
                 }
             } else if (messageReceived.messageType == MessageType.DATA) {
                 //timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
@@ -108,6 +109,9 @@ public class ReliabilityLayer {
                 if (messageReceived.payload.knowledgeableMessageType == KnowledgeableMessageType.VIEW) {
                     System.out.println("View message received");
                     viewManager.handleViewMessage((ViewManagerMessage) messageReceived.payload);
+                } else {
+                    upBuffer.add(messageReceived);
+                    internalBuffer.put(messageReceived.messageID, messageReceived);
                 }
             }
         }
@@ -132,8 +136,7 @@ public class ReliabilityLayer {
             }
             try {
                 ReliabilityMessage message = downBuffer.take();
-                upBuffer.add(message);
-                internalBuffer.put(message.messageID, message);
+                System.out.println("Sending VSync message");
                 handler.sendMessageBroadcast(message);
                 ackMap.sendMessage(message.messageID, viewManager.getConnectedClients());
                 checkDelivery(message);
@@ -152,13 +155,11 @@ public class ReliabilityLayer {
         ScalarClock timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
         ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message, timestamp);
         downBuffer.add(messageToSend);
-        sendMessageBroadcast();
     }
 
     public void sendViewMessage(List<UUID> destinations, ViewManagerMessage message) {
         ScalarClock timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
         ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message, timestamp);
-        internalBuffer.put(messageToSend.messageID, messageToSend);
         ackMap.sendMessage(messageToSend.messageID, destinations);
         for (UUID destination : destinations) {
             System.out.println("Sent message " + message.messageType + " to " + destination);
@@ -225,6 +226,8 @@ public class ReliabilityLayer {
 
     public void startMessageSending() {
         messageEnabled = true;
-        notifyAll();
+        synchronized (this) {
+            notifyAll();
+        }
     }
 }
