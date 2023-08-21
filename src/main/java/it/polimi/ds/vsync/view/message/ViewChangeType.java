@@ -4,7 +4,7 @@ public enum ViewChangeType {
     INIT_VIEW("InitialTopologyMessage"),
     CONFIRM("ConfirmViewChangeMessage"),
 
-    VIEW_CHANGE("ViewChangeMessage"),
+    FREEZE_VIEW("FreezeViewMessage"),
     ADVERTISE("AdvertiseMessage");
     public final String className;
 
