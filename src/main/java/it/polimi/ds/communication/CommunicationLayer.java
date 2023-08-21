@@ -308,7 +308,6 @@ public class CommunicationLayer {
     public BasicMessage getMessage() {
         try {
             BasicMessage message = upBuffer.take();
-            System.out.println("Message taken from the upBuffer of the Communication Layer");
             return message;
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
