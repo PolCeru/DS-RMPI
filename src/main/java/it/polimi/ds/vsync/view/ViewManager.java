@@ -45,7 +45,7 @@ public class ViewManager {
     private final List<UUID> waitingHosts = new LinkedList<>();
 
     public ViewManager(VSyncLayer vSyncLayer, ReliabilityLayer reliabilityLayer,
-                       CommunicationLayer communicationLayer, FaultRecovery faultRecovery){
+                       CommunicationLayer communicationLayer, FaultRecovery faultRecovery) {
         this.faultRecovery = faultRecovery;
         this.communicationLayer = communicationLayer;
         this.reliabilityLayer = reliabilityLayer;
@@ -105,6 +105,22 @@ public class ViewManager {
             throw new RuntimeException(e);
         }
         communicationLayer.startDiscoverySender(clientUID, random);
+        Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                System.out.println("Stopping message sending");
+                reliabilityLayer.stopMessageSending();
+            }
+        }, 15000);
+
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                System.out.println("Restarting message sending");
+                reliabilityLayer.startMessageSending();
+            }
+        }, 50000);
     }
 
     public void handleViewMessage(ViewManagerMessage baseMessage) {
@@ -141,7 +157,7 @@ public class ViewManager {
      * Called by FaultRecovery when the log threshold is reached, stops the sending of messages and starts the
      * stabilisation phase
      */
-    public void handleCheckpoint(){
+    public void handleCheckpoint() {
         //TODO: implement
     }
 
