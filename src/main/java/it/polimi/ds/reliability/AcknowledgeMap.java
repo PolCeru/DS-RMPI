@@ -44,8 +44,15 @@ public class AcknowledgeMap {
         return state.ackMap.entrySet().stream().filter(entry -> entry.getValue().equals(Boolean.FALSE)).map(Map.Entry::getKey).toList();
     }
 
-    public void remove(UUID messageId) {
+    public synchronized void remove(UUID messageId) {
         ackMap.remove(messageId);
+        notify();
+    }
+
+    public synchronized void waitEmpty() throws InterruptedException {
+        while (!ackMap.isEmpty()) {
+            wait();
+        }
     }
 
     private static class MessageState {
