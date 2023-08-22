@@ -179,26 +179,27 @@ public class ReliabilityLayer {
     /**
      * Checks if the message has been acknowledged by all clients, if not resends it
      *
-     * @param messageToSend the message to be checked
+     * @param messageToCheck the message to be checked
      */
-    private void checkDelivery(ReliabilityMessage messageToSend) {
+    private void checkDelivery(ReliabilityMessage messageToCheck) {
         Timer timer = new Timer();
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                List<UUID> list = ackMap.missingAcks(messageToSend.messageID);
+                List<UUID> list = ackMap.missingAcks(messageToCheck.messageID);
                 if (list.isEmpty()) {
-                    //TODO: log the message in the FaultRecovery class
-                    ackMap.remove(messageToSend.messageID);
+                    if(messageToCheck.getPayload().knowledgeableMessageType == KnowledgeableMessageType.VSYNC)
+                        faultRecovery.logMessage((VSyncMessage) messageToCheck.getPayload());
+                    ackMap.remove(messageToCheck.messageID);
                     timer.cancel();
                 } else {
                     list.forEach(id -> {
-                        if (!retries.containsKey(messageToSend)) {
-                            retries.put(messageToSend, 1);
-                            handler.sendMessage(id, messageToSend);
-                        } else if (retries.get(messageToSend) <= MAX_RETRIES) {
-                            retries.put(messageToSend, retries.get(messageToSend) + 1);
-                            handler.sendMessage(id, messageToSend);
+                        if (!retries.containsKey(messageToCheck)) {
+                            retries.put(messageToCheck, 1);
+                            handler.sendMessage(id, messageToCheck);
+                        } else if (retries.get(messageToCheck) <= MAX_RETRIES) {
+                            retries.put(messageToCheck, retries.get(messageToCheck) + 1);
+                            handler.sendMessage(id, messageToCheck);
                         } else handler.disconnectClient(id);
                     });
                 }
