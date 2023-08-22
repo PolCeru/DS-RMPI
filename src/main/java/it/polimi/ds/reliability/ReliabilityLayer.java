@@ -36,7 +36,7 @@ public class ReliabilityLayer {
      */
     private final AcknowledgeMap ackMap = new AcknowledgeMap();
 
-    private final Map<UUID, ReliabilityMessage> internalBuffer = new HashMap<>();
+    private final Map<UUID, ReliabilityMessage> unstableReceivedMessages = new HashMap<>();
 
     /**
      * Map of messages and their number of retries
@@ -80,8 +80,12 @@ public class ReliabilityLayer {
             DataMessage dataMessage = (DataMessage) handler.getMessage();
             UUID senderUID = dataMessage.senderUID;
             ReliabilityMessage messageReceived = dataMessage.payload;
-            System.out.println("Received " + messageReceived.messageType + " message with ID " +
-                    messageReceived.messageID + " from " + senderUID);
+            if (messageReceived.messageType == MessageType.ACK)
+                System.out.println("Received " + messageReceived.messageType + " message with ID " +
+                        messageReceived.messageID + "for message " + messageReceived.referenceMessageID + " from " + senderUID);
+            else
+                System.out.println("Received " + messageReceived.messageType + " message with ID " +
+                        messageReceived.messageID + " from " + senderUID);
 
             //Checks which scalar clock is higher and updates the eventID
             ScalarClock timestamp = new ScalarClock(viewManager.getProcessID(),
@@ -92,30 +96,19 @@ public class ReliabilityLayer {
                 ackMap.receiveAck(referencedMessageId, senderUID, viewManager.getConnectedClients());
 
                 //if all clients have acknowledged the message, remove it from the ackMap
-                if (ackMap.isComplete(referencedMessageId)) {
-                    ReliabilityMessage message = internalBuffer.remove(referencedMessageId);
-                    if (message != null) upBuffer.markStable(message);
-                }
+                checkReceivedStable(referencedMessageId);
             } else if (messageReceived.messageType == MessageType.DATA) {
                 //timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
                 List<UUID> uuids = new ArrayList<>(viewManager.getConnectedClients());
                 uuids.remove(senderUID);
                 ackMap.receiveMessage(messageReceived.messageID, uuids);
-                if (messageReceived.payload.knowledgeableMessageType == KnowledgeableMessageType.VIEW && ((ViewManagerMessage) messageReceived.payload).messageType == ViewChangeType.FREEZE_VIEW) {
-                    System.err.println("Add to ackmap the message with recipients" + viewManager.getConnectedClients());
-                    System.err.println("Ackmaps status: " + ackMap.isComplete(messageReceived.messageID));
-                }
                 sendAck(messageReceived, timestamp, senderUID);
-
                 if (messageReceived.payload.knowledgeableMessageType == KnowledgeableMessageType.VIEW) {
-                    System.out.println("View message received");
-                    viewManager.handleViewMessage((ViewManagerMessage) messageReceived.payload);
+                    viewManager.getBuffer().add(messageReceived);
                 } else {
                     upBuffer.add(messageReceived);
-                    internalBuffer.put(messageReceived.messageID, messageReceived);
                 }
                 unstableReceivedMessages.put(messageReceived.messageID, messageReceived);
-                System.err.println("Added message " + messageReceived.messageID + " to unstableReceivedMessages: " + messageReceived);
                 checkReceivedStable(messageReceived.messageID);
             }
         }
@@ -124,9 +117,7 @@ public class ReliabilityLayer {
     private void checkReceivedStable(UUID referencedMessageId) {
         if (ackMap.isComplete(referencedMessageId)) {
             ReliabilityMessage message = unstableReceivedMessages.remove(referencedMessageId);
-            System.err.println("Removed message " + referencedMessageId + " from unstableReceivedMessages: " + message);
             if (message != null) {
-                System.err.println("Removing and stabilizing message " + referencedMessageId);
                 if (message.payload.knowledgeableMessageType == KnowledgeableMessageType.VIEW)
                     viewManager.getBuffer().markStable(message);
                 else
@@ -134,6 +125,15 @@ public class ReliabilityLayer {
                 ackMap.remove(referencedMessageId);
             }
         }
+    }
+
+    private void sendAck(ReliabilityMessage messageReceived, ScalarClock timestamp, UUID senderUID) {
+        UUID ackMessageUID = UUID.randomUUID();
+        ReliabilityMessage ackMessage = new ReliabilityMessage(ackMessageUID, messageReceived.messageID,
+                timestamp);
+        handler.sendMessageBroadcast(ackMessage);
+        System.out.println("Sent ACK for message " + messageReceived.messageID + " with id "
+                + ackMessageUID + " to " + senderUID);
     }
 
     /**
@@ -155,7 +155,7 @@ public class ReliabilityLayer {
             }
             try {
                 ReliabilityMessage message = downBuffer.take();
-                System.out.println("Sending VSync message");
+                System.out.println("Sending VSync message with ID " + message.messageID + " to all clients");
                 handler.sendMessageBroadcast(message);
                 ackMap.sendMessage(message.messageID, viewManager.getConnectedClients());
                 checkDelivery(message);
@@ -174,17 +174,6 @@ public class ReliabilityLayer {
         ScalarClock timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
         ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message, timestamp);
         downBuffer.add(messageToSend);
-    }
-
-    public void sendViewMessage(List<UUID> destinations, ViewManagerMessage message) {
-        ScalarClock timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
-        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message, timestamp);
-        ackMap.sendMessage(messageToSend.messageID, destinations);
-        for (UUID destination : destinations) {
-            System.out.println("Sent message " + message.messageType + " to " + destination);
-            handler.sendMessage(destination, messageToSend);
-            checkDelivery(messageToSend);
-        }
     }
 
     /**
@@ -217,6 +206,17 @@ public class ReliabilityLayer {
         }, TIMEOUT_RESEND, TIMEOUT_RESEND);
     }
 
+    public void sendViewMessage(List<UUID> destinations, ViewManagerMessage message) {
+        ScalarClock timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
+        ReliabilityMessage messageToSend = new ReliabilityMessage(UUID.randomUUID(), message, timestamp);
+        ackMap.sendMessage(messageToSend.messageID, destinations);
+        for (UUID destination : destinations) {
+            System.out.println("Sent message " + message.messageType + " with ID " + messageToSend.messageID + " to " + destination);
+            handler.sendMessage(destination, messageToSend);
+            checkDelivery(messageToSend);
+        }
+    }
+
     /**
      * Used only for testing purposes
      */
@@ -247,6 +247,15 @@ public class ReliabilityLayer {
         messageEnabled = true;
         synchronized (this) {
             notifyAll();
+        }
+    }
+
+    public void waitStabilization() {
+        try {
+            Thread.sleep(1000);
+            ackMap.waitEmpty();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 }

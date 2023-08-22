@@ -2,17 +2,19 @@ package it.polimi.ds.vsync.view;
 
 import it.polimi.ds.communication.CommunicationLayer;
 import it.polimi.ds.communication.message.DiscoveryMessage;
+import it.polimi.ds.reliability.AcknowledgeMap;
 import it.polimi.ds.reliability.ReliabilityLayer;
+import it.polimi.ds.reliability.ReliabilityMessage;
+import it.polimi.ds.utils.StablePriorityBlockingQueue;
 import it.polimi.ds.vsync.VSyncLayer;
 import it.polimi.ds.vsync.faultTolerance.FaultRecovery;
-import it.polimi.ds.vsync.view.message.AdvertiseMessage;
-import it.polimi.ds.vsync.view.message.ConfirmViewChangeMessage;
-import it.polimi.ds.vsync.view.message.InitialTopologyMessage;
-import it.polimi.ds.vsync.view.message.ViewManagerMessage;
+import it.polimi.ds.vsync.view.message.*;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class ViewManager {
 
@@ -44,11 +46,28 @@ public class ViewManager {
 
     private final List<UUID> waitingHosts = new LinkedList<>();
 
+    private final StablePriorityBlockingQueue<ReliabilityMessage> buffer = new StablePriorityBlockingQueue<>();
+
+    private final BlockingQueue<ConfirmViewChangeMessage> confirmBuffer = new LinkedBlockingQueue<>();
+
     public ViewManager(VSyncLayer vSyncLayer, ReliabilityLayer reliabilityLayer,
                        CommunicationLayer communicationLayer, FaultRecovery faultRecovery) {
         this.faultRecovery = faultRecovery;
         this.communicationLayer = communicationLayer;
         this.reliabilityLayer = reliabilityLayer;
+        new Thread("ViewManager") {
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        ViewManagerMessage message = getMessage();
+                        handleViewMessage(message);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }.start();
     }
 
     /**
@@ -105,52 +124,10 @@ public class ViewManager {
             throw new RuntimeException(e);
         }
         communicationLayer.startDiscoverySender(clientUID, random);
-        Timer timer = new Timer();
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                System.out.println("Stopping message sending");
-                reliabilityLayer.stopMessageSending();
-            }
-        }, 15000);
-
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                System.out.println("Restarting message sending");
-                reliabilityLayer.startMessageSending();
-            }
-        }, 50000);
     }
 
-    public void handleViewMessage(ViewManagerMessage baseMessage) {
-        switch (baseMessage.messageType) {
-            case CONFIRM -> {
-                ConfirmViewChangeMessage message = (ConfirmViewChangeMessage) baseMessage;
-                if (!isConnected) {
-                    connectedHosts.add(message.senderUid);
-                    isConnected = true;
-                } else {
-                    //TODO what action confirm this operation??
-                }
-            }
-            case INIT_VIEW -> {
-                InitialTopologyMessage message = (InitialTopologyMessage) baseMessage;
-                if (!isConnected) {
-                    realViewManager = Optional.of(message.viewManagerId);
-                    if (message.topology.size() == 1) {
-                        //only the viewManager connected
-                        handleNewConnection(realViewManager.get());
-                    } else {
-                        //TODO implement method that create a waitingList with provided list,
-                        // confirm that's ready to viewManager and wait for all connections
-                    }
-                } else {
-                    //TODO manage the error or avoid?
-                }
-                //TODO: case RECOVER e RECOVERY_PACKET
-            }
-        }
+    private ViewManagerMessage getMessage() throws InterruptedException {
+        return (ViewManagerMessage) buffer.retrieveStable().payload;
     }
 
     /**
@@ -187,5 +164,83 @@ public class ViewManager {
 
     public int getProcessID() {
         return processID;
+    }
+
+    public void handleViewMessage(ViewManagerMessage baseMessage) {
+        System.out.println("Received message " + baseMessage.messageType);
+        switch (baseMessage.messageType) {
+            case CONFIRM -> {
+                ConfirmViewChangeMessage message = (ConfirmViewChangeMessage) baseMessage;
+                if (!isConnected) {
+                    connectedHosts.add(message.senderUid);
+                    isConnected = true;
+                    Timer timer = new Timer();
+                    timer.schedule(new TimerTask() {
+                        @Override
+                        public void run() {
+                            if (realViewManager.isEmpty()) {
+                                System.out.println("Freezing message sending");
+                                startFreezeView();
+                            }
+                        }
+                    }, 10000);
+                } else {
+                    confirmBuffer.add(message);
+                }
+            }
+            case INIT_VIEW -> {
+                InitialTopologyMessage message = (InitialTopologyMessage) baseMessage;
+                if (!isConnected) {
+                    realViewManager = Optional.of(message.viewManagerId);
+                    if (message.topology.size() == 1) {
+                        //only the viewManager connected
+                        handleNewConnection(realViewManager.get());
+                    } else {
+                        //TODO implement method that create a waitingList with provided list,
+                        // confirm that's ready to viewManager and wait for all connections
+                    }
+                } else {
+                    //TODO manage the error or avoid?
+                }
+                reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
+                        ViewChangeType.INIT_VIEW));
+                //TODO: case RECOVER e RECOVERY_PACKET
+            }
+            case FREEZE_VIEW -> {
+                reliabilityLayer.stopMessageSending();
+                reliabilityLayer.waitStabilization();
+                System.out.println("Normal client: stable view");
+                reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
+                        ViewChangeType.FREEZE_VIEW));
+            }
+        }
+    }
+
+    private void startFreezeView() {
+        reliabilityLayer.stopMessageSending();
+        AcknowledgeMap viewAckMap = new AcknowledgeMap();
+        FreezeViewMessage freezeMessage = new FreezeViewMessage();
+        System.out.print("ViewManager:");
+        viewAckMap.sendMessage(freezeMessage.uuid, connectedHosts);
+        reliabilityLayer.sendViewMessage(connectedHosts, freezeMessage);
+        while (!viewAckMap.isComplete(freezeMessage.uuid)) {
+            try {
+                ConfirmViewChangeMessage confirmMessage = confirmBuffer.take();
+                if (confirmMessage.confirmedAction == ViewChangeType.FREEZE_VIEW) {
+                    System.out.println("ViewManager:" + freezeMessage.uuid);
+                    viewAckMap.receiveAck(freezeMessage.uuid, confirmMessage.senderUid, connectedHosts);
+                } else {
+                    System.err.println("Unexpected confirm for action " + confirmMessage.confirmedAction);
+                }
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        reliabilityLayer.waitStabilization();
+        System.out.println("Manager: stable view");
+    }
+
+    public StablePriorityBlockingQueue<ReliabilityMessage> getBuffer() {
+        return buffer;
     }
 }
