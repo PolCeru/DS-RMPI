@@ -98,13 +98,14 @@ public class ReliabilityLayer {
                 }
             } else if (messageReceived.messageType == MessageType.DATA) {
                 //timestamp = new ScalarClock(viewManager.getProcessID(), eventID++);
-                ackMap.receiveMessage(messageReceived.messageID, viewManager.getConnectedClients());
-                UUID ackMessageUID = UUID.randomUUID();
-                ReliabilityMessage ackMessage = new ReliabilityMessage(ackMessageUID, messageReceived.messageID,
-                        timestamp);
-                handler.sendMessageBroadcast(ackMessage);
-                System.out.println("Sent ACK for message " + messageReceived.messageID + " with id "
-                        + ackMessageUID + " to " + senderUID);
+                List<UUID> uuids = new ArrayList<>(viewManager.getConnectedClients());
+                uuids.remove(senderUID);
+                ackMap.receiveMessage(messageReceived.messageID, uuids);
+                if (messageReceived.payload.knowledgeableMessageType == KnowledgeableMessageType.VIEW && ((ViewManagerMessage) messageReceived.payload).messageType == ViewChangeType.FREEZE_VIEW) {
+                    System.err.println("Add to ackmap the message with recipients" + viewManager.getConnectedClients());
+                    System.err.println("Ackmaps status: " + ackMap.isComplete(messageReceived.messageID));
+                }
+                sendAck(messageReceived, timestamp, senderUID);
 
                 if (messageReceived.payload.knowledgeableMessageType == KnowledgeableMessageType.VIEW) {
                     System.out.println("View message received");
@@ -113,6 +114,24 @@ public class ReliabilityLayer {
                     upBuffer.add(messageReceived);
                     internalBuffer.put(messageReceived.messageID, messageReceived);
                 }
+                unstableReceivedMessages.put(messageReceived.messageID, messageReceived);
+                System.err.println("Added message " + messageReceived.messageID + " to unstableReceivedMessages: " + messageReceived);
+                checkReceivedStable(messageReceived.messageID);
+            }
+        }
+    }
+
+    private void checkReceivedStable(UUID referencedMessageId) {
+        if (ackMap.isComplete(referencedMessageId)) {
+            ReliabilityMessage message = unstableReceivedMessages.remove(referencedMessageId);
+            System.err.println("Removed message " + referencedMessageId + " from unstableReceivedMessages: " + message);
+            if (message != null) {
+                System.err.println("Removing and stabilizing message " + referencedMessageId);
+                if (message.payload.knowledgeableMessageType == KnowledgeableMessageType.VIEW)
+                    viewManager.getBuffer().markStable(message);
+                else
+                    upBuffer.markStable(message);
+                ackMap.remove(referencedMessageId);
             }
         }
     }
