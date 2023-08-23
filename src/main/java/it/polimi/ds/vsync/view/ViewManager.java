@@ -95,6 +95,7 @@ public class ViewManager {
                             waitingHosts.remove(message.senderUid);
                             assert waitingHosts.isEmpty();
                             connectedHosts.add(message.senderUid);
+                            confirmBuffer.add(message);
                         }
                         case CONNECT_REQ -> {
                             //received by group member from the new host when it's connected
@@ -266,14 +267,33 @@ public class ViewManager {
             //TODO: handle creation logic and propagation of the view
             waitingHosts.add(newHostId);
             startFreezeView();
-            waitingHosts.add(newHostId);
             communicationLayer.initConnection(newHostAddress, newHostId);
+            AcknowledgeMap acknowledgeMap = new AcknowledgeMap();
+            //sent init view message to new host
+            InitialTopologyMessage initialTopologyMessage = new InitialTopologyMessage(clientUID, clientsProcessIDCounter++, getCompleteTopology());
             reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId),
-                    new InitialTopologyMessage(clientUID, clientsProcessIDCounter++, getCompleteTopology()));
-
-            NewHostMessage message = new NewHostMessage(newHostAddress, newHostId,
+                    initialTopologyMessage);
+            acknowledgeMap.sendMessage(initialTopologyMessage.uuid, Collections.singletonList(newHostId));
+            //sent new host message to all other hosts
+            NewHostMessage newHostMessage = new NewHostMessage(newHostAddress, newHostId,
                     newHostRandom);
-            sendBroadcastAndWaitConfirms(message);
+            reliabilityLayer.sendViewMessage(connectedHosts, newHostMessage);
+            acknowledgeMap.sendMessage(newHostMessage.uuid, connectedHosts);
+            //wait for all confirms
+            while (!acknowledgeMap.isComplete(newHostMessage.uuid) || !acknowledgeMap.isComplete(initialTopologyMessage.uuid)) {
+                try {
+                    ConfirmViewChangeMessage confirmMessage = confirmBuffer.take();
+                    if (confirmMessage.confirmedAction == initialTopologyMessage.messageType) {
+                        acknowledgeMap.receiveAck(initialTopologyMessage.uuid, confirmMessage.senderUid, connectedHosts);
+                    } else if (confirmMessage.confirmedAction == newHostMessage.messageType) {
+                        acknowledgeMap.receiveAck(newHostMessage.uuid, confirmMessage.senderUid, connectedHosts);
+                    } else {
+                        System.err.println("Unexpected confirm for action " + confirmMessage.confirmedAction);
+                    }
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
             RestartViewMessage restartViewMessage = new RestartViewMessage();
             sendBroadcastAndWaitConfirms(restartViewMessage);
             endViewFreeze();
