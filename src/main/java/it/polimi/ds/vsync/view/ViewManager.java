@@ -104,6 +104,7 @@ public class ViewManager {
                             connectedHosts.add(message.senderUid);
                             reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()),
                                     new ConfirmViewChangeMessage(clientUID, ViewChangeType.NEW_HOST));
+                            viewChangeList = null;
                         }
                         case RESTART_VIEW -> {
                             confirmBuffer.add(message);
@@ -263,6 +264,7 @@ public class ViewManager {
             }
         } else if (realViewManager.isEmpty()) { //what to do when you are the real manager
             //TODO: handle creation logic and propagation of the view
+            waitingHosts.add(newHostId);
             startFreezeView();
             waitingHosts.add(newHostId);
             communicationLayer.initConnection(newHostAddress, newHostId);
