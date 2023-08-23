@@ -35,4 +35,8 @@ public class VSyncLayer {
     public ReliabilityLayer getHandler() {
         return handler;
     }
+
+    public ViewManager getViewManager() {
+        return viewManager;
+    }
 }

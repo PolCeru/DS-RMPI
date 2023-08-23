@@ -39,19 +39,6 @@ public class ReliabilityMessage implements Comparable<ReliabilityMessage> {
         this.referenceMessageID = referenceMessageID;
         this.timestamp = timestamp;
     }
-
-    public MessageType getMessageType() {
-        return messageType;
-    }
-
-    public UUID getReferenceMessageID() {
-        return referenceMessageID;
-    }
-
-    public UUID getMessageID() {
-        return messageID;
-    }
-
     public KnowledgeableMessage getPayload() {
         return payload;
     }

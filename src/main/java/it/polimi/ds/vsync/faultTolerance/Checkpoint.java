@@ -6,9 +6,9 @@ public class Checkpoint {
 
     private final int checkpointID;
 
-    private final ArrayList<Byte[]> messages;
+    private final ArrayList<byte[]> messages;
 
-    public Checkpoint(int checkpointID, ArrayList<Byte[]> messages) {
+    public Checkpoint(int checkpointID, ArrayList<byte[]> messages) {
         this.checkpointID = checkpointID;
         this.messages = messages;
     }
@@ -17,7 +17,7 @@ public class Checkpoint {
         return checkpointID;
     }
 
-    public ArrayList<Byte[]> getMessages() {
+    public ArrayList<byte[]> getMessages() {
         return messages;
     }
 
