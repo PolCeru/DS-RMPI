@@ -124,8 +124,10 @@ public class ReliabilityLayer {
             if (message != null) {
                 if (message.payload.knowledgeableMessageType == KnowledgeableMessageType.VIEW)
                     viewManager.getBuffer().markStable(message);
-                else
+                else {
+                    faultRecovery.logMessage((VSyncMessage) message.getPayload());
                     upBuffer.markStable(message);
+                }
                 ackMap.remove(referencedMessageId);
             }
         }
@@ -198,7 +200,7 @@ public class ReliabilityLayer {
             public void run() {
                 List<UUID> list = ackMap.missingAcks(messageToCheck.messageID);
                 if (list.isEmpty()) {
-                    if(messageToCheck.getPayload().knowledgeableMessageType == KnowledgeableMessageType.VSYNC)
+                    if (messageToCheck.getPayload().knowledgeableMessageType == KnowledgeableMessageType.VSYNC)
                         faultRecovery.logMessage((VSyncMessage) messageToCheck.getPayload());
                     ackMap.remove(messageToCheck.messageID);
                     timer.cancel();
