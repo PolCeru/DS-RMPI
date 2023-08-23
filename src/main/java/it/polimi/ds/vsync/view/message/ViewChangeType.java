@@ -5,7 +5,10 @@ public enum ViewChangeType {
     CONFIRM("ConfirmViewChangeMessage"),
 
     FREEZE_VIEW("FreezeViewMessage"),
-    ADVERTISE("AdvertiseMessage");
+    ADVERTISE("AdvertiseMessage"),
+    CONNECT_REQ("ConnectRequestMessage"),
+    NEW_HOST("NewHostMessage"),
+    RESTART_VIEW("RestartViewMessage");
     public final String className;
 
     ViewChangeType(String className) {
