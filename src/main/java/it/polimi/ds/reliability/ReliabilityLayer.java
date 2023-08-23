@@ -57,7 +57,7 @@ public class ReliabilityLayer {
 
     private final ViewManager viewManager;
 
-    private boolean messageEnabled = true;
+    private boolean messageEnabled = false;
 
     private final FaultRecovery faultRecovery;
 
@@ -228,8 +228,8 @@ public class ReliabilityLayer {
         for (UUID destination : destinations) {
             System.out.println("Sent message " + message.messageType + " with ID " + messageToSend.messageID + " to " + destination);
             handler.sendMessage(destination, messageToSend);
-            checkDelivery(messageToSend);
         }
+        checkDelivery(messageToSend);
     }
 
     /**
