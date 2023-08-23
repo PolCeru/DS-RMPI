@@ -7,6 +7,7 @@ import it.polimi.ds.reliability.ReliabilityLayer;
 import it.polimi.ds.reliability.ReliabilityMessage;
 import it.polimi.ds.utils.StablePriorityBlockingQueue;
 import it.polimi.ds.vsync.VSyncLayer;
+import it.polimi.ds.vsync.faultTolerance.Checkpoint;
 import it.polimi.ds.vsync.faultTolerance.FaultRecovery;
 import it.polimi.ds.vsync.view.message.*;
 
@@ -91,6 +92,8 @@ public class ViewManager {
                                 confirmBuffer.add(message);
                         case NEW_HOST -> //received by manager when a group member connected with new host
                                 confirmBuffer.add(message);
+                        case CHECKPOINT -> //received by manager when a group member received the checkpoint
+                                confirmBuffer.add(message);
                         case INIT_VIEW -> {
                             waitingHosts.remove(message.senderUid);
                             assert waitingHosts.isEmpty();
@@ -148,7 +151,6 @@ public class ViewManager {
                 }
                 reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
                         ViewChangeType.INIT_VIEW));
-                //TODO: case RECOVER e RECOVERY_PACKET
             }
             case FREEZE_VIEW -> {
                 reliabilityLayer.stopMessageSending();
@@ -158,7 +160,7 @@ public class ViewManager {
                         ViewChangeType.FREEZE_VIEW));
             }
             case NEW_HOST -> {
-                //received by view member from manager when new host try to connect
+                //received by group member from manager when new host try to connect
                 NewHostMessage message = (NewHostMessage) baseMessage;
                 if (viewChangeList == null)
                     viewChangeList = ViewChangeList.fromExpectedUsers(Collections.singletonList(message.newHostId));
@@ -185,6 +187,17 @@ public class ViewManager {
                         ViewChangeType.RESTART_VIEW));
                 endViewFreeze();
             }
+            case CHECKPOINT -> {
+                //TODO: Save the checkpoint on the disk
+                CheckpointMessage message = (CheckpointMessage) baseMessage;
+                ArrayList<Checkpoint> checkpointList = new ArrayList<>();
+                checkpointList.add(message.checkpoint);
+                faultRecovery.addCheckpoints(checkpointList);
+                reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
+                        ViewChangeType.CHECKPOINT));
+            }
+            //TODO: case RECOVER_REQUEST e RECOVERY_PACKET, (remember to start a checkpoint when a user
+            // disconnects/connects)
             default -> throw new RuntimeException("Unexpected message type " + baseMessage.messageType);
         }
     }
@@ -230,10 +243,20 @@ public class ViewManager {
 
     /**
      * Called by FaultRecovery when the log threshold is reached, stops the sending of messages and starts the
-     * stabilisation phase
+     * stabilisation phase and the checkpointing (with doCheckpoint)
      */
     public void handleCheckpoint() {
-        //TODO: implement
+        if(realViewManager.isEmpty()){
+            startFreezeView();
+            Checkpoint checkpointToSend = faultRecovery.doCheckpoint();
+            //TODO: send checkpoint message to everyone else
+            // crea il messaggio, aggiungilo al confirm buffer
+            CheckpointMessage checkpointMessage = new CheckpointMessage(checkpointToSend);
+            sendBroadcastAndWaitConfirms(checkpointMessage);
+            RestartViewMessage restartViewMessage = new RestartViewMessage();
+            sendBroadcastAndWaitConfirms(restartViewMessage);
+            endViewFreeze();
+        }
     }
 
     /**
