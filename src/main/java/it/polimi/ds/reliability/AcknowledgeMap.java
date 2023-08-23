@@ -14,9 +14,10 @@ public class AcknowledgeMap {
         ackMap.put(messageId, MessageState.ofMessage(recipients));
     }
 
-    public void receiveMessage(UUID messageId, List<UUID> recipients) {
+    public void receiveMessage(UUID messageId, UUID senderId, List<UUID> recipients) {
         if (isPresent(messageId)) {
             ackMap.get(messageId).setMessageReceived();
+            ackMap.get(messageId).setAck(senderId);
         } else {
             ackMap.put(messageId, MessageState.ofMessage(recipients));
         }
