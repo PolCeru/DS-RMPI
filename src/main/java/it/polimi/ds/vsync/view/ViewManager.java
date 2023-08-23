@@ -167,10 +167,6 @@ public class ViewManager {
                 else System.err.println("Received NEW_HOST message while view change list not null");
                 handleNewHost(message.newHostId, message.newHostRandom, message.newHostAddress);
             }
-            case ADVERTISE -> {
-                AdvertiseMessage message = (AdvertiseMessage) baseMessage;
-                handleNewHost(message.newHostId, Integer.MAX_VALUE, message.newHostAddress);
-            }
             case CONNECT_REQ -> {
                 //received by new host from non view manager if group already present
                 ConnectRequestMessage message = (ConnectRequestMessage) baseMessage;
@@ -297,13 +293,10 @@ public class ViewManager {
             RestartViewMessage restartViewMessage = new RestartViewMessage();
             sendBroadcastAndWaitConfirms(restartViewMessage);
             endViewFreeze();
-        } else if (viewChangeList != null) {
+        } else if (viewChangeList != null) { //you received a NEW_HOST message
             startConnection(newHostId, newHostAddress);
             reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId),
                     new ConnectRequestMessage(clientUID));
-        } else {
-            //reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new AdvertiseMessage(newHostAddress,
-            //        newHostId));
         }
     }
 

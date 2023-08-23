@@ -5,7 +5,6 @@ public enum ViewChangeType {
     CONFIRM("ConfirmViewChangeMessage"),
 
     FREEZE_VIEW("FreezeViewMessage"),
-    ADVERTISE("AdvertiseMessage"),
     CONNECT_REQ("ConnectRequestMessage"),
     NEW_HOST("NewHostMessage"),
     RESTART_VIEW("RestartViewMessage");
