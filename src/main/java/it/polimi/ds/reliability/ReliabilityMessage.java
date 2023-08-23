@@ -1,6 +1,7 @@
 package it.polimi.ds.reliability;
 
 import it.polimi.ds.vsync.KnowledgeableMessage;
+import it.polimi.ds.vsync.view.message.ViewManagerMessage;
 
 import java.util.UUID;
 
@@ -18,6 +19,14 @@ public class ReliabilityMessage implements Comparable<ReliabilityMessage> {
     public ReliabilityMessage(UUID messageID, KnowledgeableMessage payload, ScalarClock timestamp) {
         this.messageID = messageID;
         this.messageType = MessageType.DATA;
+        this.payload = payload;
+        this.referenceMessageID = messageID;
+        this.timestamp = timestamp;
+    }
+
+    public ReliabilityMessage(UUID messageID, ViewManagerMessage payload, MessageType messageType, ScalarClock timestamp) {
+        this.messageID = messageID;
+        this.messageType = messageType;
         this.payload = payload;
         this.referenceMessageID = messageID;
         this.timestamp = timestamp;
