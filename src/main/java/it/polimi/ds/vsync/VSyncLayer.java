@@ -29,7 +29,7 @@ public class VSyncLayer {
             public void run() {
                 handler.sendMessage(new VSyncMessage("test".getBytes()));
             }
-        }, 10000, 2000);
+        }, 10000, 4000);
     }
 
     public ReliabilityLayer getHandler() {
