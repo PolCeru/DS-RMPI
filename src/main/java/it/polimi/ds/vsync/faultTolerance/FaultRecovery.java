@@ -32,20 +32,16 @@ public class FaultRecovery {
     /**
      * This method adds the checkpoints received in the list and updates the checkpoint counter.
      * Then proceeds to write the checkpoints into disk.
-     * in case the log in the recoveryPacket is not empty it adds the messages in the log in the correct order
-     * @param recoveryPacket the recovery packet containing the checkpoint and the log
+     * in case the log in the checkpointsToAdd is not empty it adds the messages in the log in the correct order
+     * @param checkpointsToAdd the recovery packet containing the checkpoint and the log
      */
-    public void initFaultRecovery(RecoveryPacket recoveryPacket){
-        checkpoints.addAll(recoveryPacket.checkpoints());
+    public void addCheckpoints(ArrayList<Checkpoint> checkpointsToAdd){
+        checkpoints.addAll(checkpointsToAdd);
         checkpoints.sort(Comparator.comparingInt(Checkpoint::getCheckpointID));
         checkpointCounter = Math.max(checkpoints.get(checkpoints.size() - 1).getCheckpointID(), checkpointCounter) + 1;
 
-        recoveryPacket.checkpoints().forEach(checkpoint -> writeCheckpointOnFile(checkpoint.getMessages()));
-
-        //do we need to merge or just add is fine because we know that the log is empty?
-        if(!recoveryPacket.log().isEmpty()){
-            log.addAll(recoveryPacket.log());
-        }
+        checkpointsToAdd.forEach(checkpoint -> writeCheckpointOnFile(checkpoint.getMessages()));
+        log.clear();
     }
 
     /**
@@ -66,15 +62,14 @@ public class FaultRecovery {
      * @param checkpointID the checkpoint to be recovered
      * @return the recovery packet containing the requested checkpoints and the log
      */
-    public RecoveryPacket recoverCheckpoint(int checkpointID){
+    public ArrayList<Checkpoint> recoverCheckpoint(int checkpointID){
         for (Checkpoint checkpoint : checkpoints) {
             if(checkpoint.getCheckpointID() == checkpointID){
                 ArrayList<Checkpoint> checkpointsToReturn = new ArrayList<>();
                 for (int i = checkpointCounter; i < checkpoints.size(); i++) {
                     checkpointsToReturn.add(checkpoints.get(i));
                 }
-                //log.clear()???
-                return new RecoveryPacket(checkpointsToReturn, log);
+                return new ArrayList<>(checkpointsToReturn);
             } else throw new IllegalArgumentException("Checkpoint not found");
         }
         return null;
