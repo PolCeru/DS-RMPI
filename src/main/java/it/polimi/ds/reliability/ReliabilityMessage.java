@@ -45,12 +45,6 @@ public class ReliabilityMessage implements Comparable<ReliabilityMessage> {
 
     @Override
     public int compareTo(ReliabilityMessage o) {
-        if (this.timestamp.eventID() < o.timestamp.eventID()) {
-            return -1;
-        } else if (this.timestamp.eventID() > o.timestamp.eventID()) {
-            return +1;
-        } else {
-            return Integer.compare(timestamp.processID(), o.timestamp.processID());
-        }
+        return timestamp.compareTo(o.timestamp);
     }
 }
