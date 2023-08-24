@@ -14,7 +14,7 @@ import java.util.UUID;
  */
 public class ClientHandler implements Runnable {
     /**
-     * The clientID is the unique identifier of this client
+     * The clientUID is the unique identifier of this client
      */
     private final UUID clientUID;
 
@@ -33,8 +33,8 @@ public class ClientHandler implements Runnable {
      */
     private final CommunicationLayer messageHandler;
 
-    public ClientHandler(UUID clientID, Socket socket, CommunicationLayer messageHandler) throws IOException {
-        this.clientUID = clientID;
+    public ClientHandler(UUID clientUID, Socket socket, CommunicationLayer messageHandler) throws IOException {
+        this.clientUID = clientUID;
         this.inputStream = new DataInputStream(socket.getInputStream());
         this.outputStream = new DataOutputStream(socket.getOutputStream());
         this.messageHandler = messageHandler;
@@ -86,7 +86,7 @@ public class ClientHandler implements Runnable {
     }
 
     /**
-     * @return the clientID of this client
+     * @return the clientUID of this client
      */
     public UUID getClientUID() {
         return clientUID;
