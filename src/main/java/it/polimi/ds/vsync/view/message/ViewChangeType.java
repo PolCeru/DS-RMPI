@@ -3,7 +3,7 @@ package it.polimi.ds.vsync.view.message;
 public enum ViewChangeType {
     INIT_VIEW("InitialTopologyMessage"),
     CONFIRM("ConfirmViewChangeMessage"),
-
+    CHECKPOINT("CheckpointMessage"),
     FREEZE_VIEW("FreezeViewMessage"),
     CONNECT_REQ("ConnectRequestMessage"),
     NEW_HOST("NewHostMessage"),

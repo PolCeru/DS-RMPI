@@ -7,6 +7,7 @@ import it.polimi.ds.reliability.ReliabilityLayer;
 import it.polimi.ds.reliability.ReliabilityMessage;
 import it.polimi.ds.utils.StablePriorityBlockingQueue;
 import it.polimi.ds.vsync.VSyncLayer;
+import it.polimi.ds.vsync.faultTolerance.Checkpoint;
 import it.polimi.ds.vsync.faultTolerance.FaultRecovery;
 import it.polimi.ds.vsync.view.message.*;
 import org.apache.logging.log4j.LogManager;
@@ -95,6 +96,8 @@ public class ViewManager {
                                 confirmBuffer.add(message);
                         case NEW_HOST -> //received by manager when a group member connected with new host
                                 confirmBuffer.add(message);
+                        case CHECKPOINT -> //received by manager when a group member received the checkpoint
+                                confirmBuffer.add(message);
                         case INIT_VIEW -> {
                             waitingHosts.remove(message.senderUid);
                             assert waitingHosts.isEmpty();
@@ -153,7 +156,6 @@ public class ViewManager {
                 }
                 reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
                         ViewChangeType.INIT_VIEW));
-                //TODO: case RECOVER e RECOVERY_PACKET
             }
             case FREEZE_VIEW -> {
                 reliabilityLayer.stopMessageSending();
@@ -163,7 +165,7 @@ public class ViewManager {
                         ViewChangeType.FREEZE_VIEW));
             }
             case NEW_HOST -> {
-                //received by view member from manager when new host try to connect
+                //received by group member from manager when new host try to connect
                 NewHostMessage message = (NewHostMessage) baseMessage;
                 if (viewChangeList == null)
                     viewChangeList = ViewChangeList.fromExpectedUsers(Collections.singletonList(message.newHostId));
@@ -186,6 +188,16 @@ public class ViewManager {
                         ViewChangeType.RESTART_VIEW));
                 endViewFreeze();
             }
+            case CHECKPOINT -> {
+                CheckpointMessage message = (CheckpointMessage) baseMessage;
+                ArrayList<Checkpoint> checkpointList = new ArrayList<>();
+                checkpointList.add(message.checkpoint);
+                faultRecovery.addCheckpoints(checkpointList);
+                reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
+                        ViewChangeType.CHECKPOINT));
+            }
+            //TODO: case RECOVER_REQUEST e RECOVERY_PACKET, (remember to start a checkpoint when a user
+            // disconnects/connects)
             default -> throw new RuntimeException("Unexpected message type " + baseMessage.messageType);
         }
     }
@@ -209,6 +221,46 @@ public class ViewManager {
         List<UUID> uuids = new ArrayList<>(connectedHosts);
         uuids.add(clientUID);
         return uuids;
+    }
+
+    /**
+     * Test method, used temporary to start the library functionality of this class
+     * TODO remove and add proper server functionality
+     */
+    public void start() {
+        try {
+            System.out.println("Starting host with address " + InetAddress.getLocalHost().getHostAddress() + ", " +
+                    "random " + random + " and uuid " + clientUID);
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        }
+        communicationLayer.startDiscoverySender(clientUID, random);
+    }
+
+    private ViewManagerMessage getMessage() throws InterruptedException {
+        return (ViewManagerMessage) buffer.retrieveStable().payload;
+    }
+
+    /**
+     * Called by FaultRecovery when the log threshold is reached, stops the sending of messages and starts the
+     * stabilisation phase and the checkpointing (with doCheckpoint)
+     */
+    public void handleCheckpoint() {
+        if(realViewManager.isEmpty()){
+            startFreezeView();
+            Checkpoint checkpointToSend = faultRecovery.doCheckpoint();
+            CheckpointMessage checkpointMessage = new CheckpointMessage(checkpointToSend);
+            sendBroadcastAndWaitConfirms(checkpointMessage);
+            new Thread("logConditionChecker"){
+                @Override
+                public void run() {
+                    faultRecovery.checkCondition();
+                }
+            }.start();
+            RestartViewMessage restartViewMessage = new RestartViewMessage();
+            sendBroadcastAndWaitConfirms(restartViewMessage);
+            endViewFreeze();
+        }
     }
 
     /**
@@ -277,23 +329,6 @@ public class ViewManager {
         }
     }
 
-    private ViewManagerMessage getMessage() throws InterruptedException {
-        return (ViewManagerMessage) buffer.retrieveStable().payload;
-    }
-
-    /**
-     * Called by FaultRecovery when the log threshold is reached, stops the sending of messages and starts the
-     * stabilisation phase
-     */
-    public void handleCheckpoint() {
-        //TODO: implement
-    }
-
-    private void endViewFreeze() {
-        reliabilityLayer.startMessageSending();
-        logger.trace("Connected clients: " + connectedHosts);
-    }
-
     public UUID getClientUID() {
         return clientUID;
     }
@@ -306,6 +341,16 @@ public class ViewManager {
         return processID;
     }
 
+    private void endViewFreeze() {
+        reliabilityLayer.startMessageSending();
+        logger.trace("Connected clients: " + connectedHosts);
+    }
+
+    private void startConnection(UUID newHostId, InetAddress newHostAddress) {
+        waitingHosts.add(newHostId);
+        communicationLayer.initConnection(newHostAddress, newHostId);
+    }
+
     private void startFreezeView() {
         reliabilityLayer.stopMessageSending();
         FreezeViewMessage freezeMessage = new FreezeViewMessage();
@@ -313,11 +358,6 @@ public class ViewManager {
         reliabilityLayer.waitStabilization();
         assert confirmBuffer.isEmpty();
         logger.debug("Freeze view complete");
-    }
-
-    private void startConnection(UUID newHostId, InetAddress newHostAddress) {
-        waitingHosts.add(newHostId);
-        communicationLayer.initConnection(newHostAddress, newHostId);
     }
 
     private void sendBroadcastAndWaitConfirms(ViewManagerMessage message) {
@@ -337,20 +377,6 @@ public class ViewManager {
             }
         }
         logger.trace("Received all confirms for " + message.messageType);
-    }
-
-    /**
-     * Test method, used temporary to start the library functionality of this class
-     * TODO remove and add proper server functionality
-     */
-    public void start() {
-        try {
-            logger.info("Starting host with address " + InetAddress.getLocalHost().getHostAddress() + ", " +
-                    "random " + random + " and uuid " + clientUID);
-        } catch (UnknownHostException e) {
-            throw new RuntimeException(e);
-        }
-        communicationLayer.startDiscoverySender(clientUID, random);
     }
 
     public StablePriorityBlockingQueue<ReliabilityMessage> getBuffer() {

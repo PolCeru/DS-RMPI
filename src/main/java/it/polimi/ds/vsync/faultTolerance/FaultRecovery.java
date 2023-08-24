@@ -9,6 +9,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class FaultRecovery {
     private final VSyncLayer vSyncLayer;
@@ -21,43 +23,50 @@ public class FaultRecovery {
 
     private final Gson gson = new Gson();
 
-    private final int LOG_TRESHOLD = 1024;
+    private final ReentrantLock lock;
+    
+    private final Condition thresholdCondition;
+    
+    private final int LOG_THRESHOLD = 1024;
 
-    private final String filePath = "checkpoints/Checkpoint" + checkpointCounter + ".bin";
+    private final String FILE_PATH = "checkpoints/Checkpoint" + checkpointCounter + ".bin";
 
     public FaultRecovery(VSyncLayer vSyncLayer) {
         this.vSyncLayer = vSyncLayer;
+        this.lock = new ReentrantLock();
+        this.thresholdCondition = lock.newCondition();
+        new Thread(this::checkCondition, "logConditionChecker").start();
     }
 
     /**
      * This method adds the checkpoints received in the list and updates the checkpoint counter.
      * Then proceeds to write the checkpoints into disk.
-     * in case the log in the recoveryPacket is not empty it adds the messages in the log in the correct order
-     * @param recoveryPacket the recovery packet containing the checkpoint and the log
+     * in case the log in the checkpointsToAdd is not empty it adds the messages in the log in the correct order
+     * @param checkpointsToAdd the recovery packet containing the checkpoint and the log
      */
-    public void initFaultRecovery(RecoveryPacket recoveryPacket){
-        checkpoints.addAll(recoveryPacket.checkpoints());
+    public void addCheckpoints(ArrayList<Checkpoint> checkpointsToAdd){
+        checkpoints.addAll(checkpointsToAdd);
         checkpoints.sort(Comparator.comparingInt(Checkpoint::getCheckpointID));
         checkpointCounter = Math.max(checkpoints.get(checkpoints.size() - 1).getCheckpointID(), checkpointCounter) + 1;
 
-        recoveryPacket.checkpoints().forEach(checkpoint -> writeCheckpointOnFile(checkpoint.getMessages()));
-
-        //do we need to merge or just add is fine because we know that the log is empty?
-        if(!recoveryPacket.log().isEmpty()){
-            log.addAll(recoveryPacket.log());
-        }
+        checkpointsToAdd.forEach(checkpoint -> writeCheckpointOnFile(checkpoint.getMessages()));
+        log.clear();
     }
 
     /**
      * This method creates a new checkpoint writing it into disk and emptying the log; then adds it to the list of
      * checkpoints incrementing the counter
+     * @return the created checkpoint
      */
-    public void doCheckpoint(){
+    public Checkpoint doCheckpoint(){
         Checkpoint checkpoint = new Checkpoint(checkpointCounter, log);
         writeCheckpointOnFile(log);
-        checkpointCounter++;
         checkpoints.add(checkpoint);
         log.clear();
+        System.out.println("Checkpoint " + (checkpointCounter) + " created successfully");
+        System.out.println("Log cleared after checkpoint " + (checkpointCounter));
+        checkpointCounter++;
+        return checkpoint;
     }
 
     /**
@@ -66,15 +75,14 @@ public class FaultRecovery {
      * @param checkpointID the checkpoint to be recovered
      * @return the recovery packet containing the requested checkpoints and the log
      */
-    public RecoveryPacket recoverCheckpoint(int checkpointID){
+    public ArrayList<Checkpoint> recoverCheckpoint(int checkpointID){
         for (Checkpoint checkpoint : checkpoints) {
             if(checkpoint.getCheckpointID() == checkpointID){
                 ArrayList<Checkpoint> checkpointsToReturn = new ArrayList<>();
                 for (int i = checkpointCounter; i < checkpoints.size(); i++) {
                     checkpointsToReturn.add(checkpoints.get(i));
                 }
-                //log.clear()???
-                return new RecoveryPacket(checkpointsToReturn, log);
+                return new ArrayList<>(checkpointsToReturn);
             } else throw new IllegalArgumentException("Checkpoint not found");
         }
         return null;
@@ -85,9 +93,12 @@ public class FaultRecovery {
      * @param message the message to be added to the log
      */
     public void logMessage(VSyncMessage message){
-        log.add(gson.toJson(message).getBytes());
-        if(log.size() >= LOG_TRESHOLD){
-            vSyncLayer.getViewManager().handleCheckpoint();
+        lock.lock();
+        try {
+            log.add(gson.toJson(message).getBytes());
+            thresholdCondition.signalAll();
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -96,12 +107,28 @@ public class FaultRecovery {
      * @param whatToWrite the checkpoints to be written in form of list of byte array
      */
     private void writeCheckpointOnFile(ArrayList<byte[]> whatToWrite) {
-        try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filePath))) {
+        System.out.println("Writing checkpoint " + checkpointCounter + " to file");
+        try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(FILE_PATH))) {
             for (byte[] row: whatToWrite)
                 bos.write(row);
         } catch (IOException e) {
             System.err.println("Error writing checkpoint to file\n" + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    public void checkCondition(){
+        lock.lock();
+        try {
+            while (log.size() < LOG_THRESHOLD) {
+                // Wait for the log to reach the threshold to call handleCheckpoint
+                thresholdCondition.await();
+            }
+            vSyncLayer.getViewManager().handleCheckpoint();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } finally {
+            lock.unlock();
         }
     }
 }

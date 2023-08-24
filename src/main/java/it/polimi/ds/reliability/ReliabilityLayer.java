@@ -148,6 +148,7 @@ public class ReliabilityLayer {
                 }
             }
             if (toLog) {
+                faultRecovery.logMessage((VSyncMessage) message.getPayload());
                 logger.info("Log message: " + message.messageID + " " + message.timestamp);
             }
         }
@@ -252,7 +253,7 @@ public class ReliabilityLayer {
         }
         ackMap.sendMessage(messageToSend.messageID, destinations);
         for (UUID destination : destinations) {
-            logger.debug("Sent message " + message.messageType + " with ID " + messageToSend.messageID + " to " + destination);
+            System.out.println("Sent message " + message.messageType + " with ID " + messageToSend.messageID + " to " + destination);
             handler.sendMessage(destination, messageToSend);
         }
         checkDelivery(messageToSend);
