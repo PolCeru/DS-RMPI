@@ -38,6 +38,8 @@ public class ReliabilityLayer {
 
     private final Map<UUID, ReliabilityMessage> unstableReceivedMessages = new HashMap<>();
 
+    private final Map<UUID, Timer> unstableSentMessagesTimer = new HashMap<>();
+
     /**
      * Map of messages and their number of retries
      */
@@ -129,6 +131,12 @@ public class ReliabilityLayer {
                     upBuffer.markStable(message);
                 }
                 ackMap.remove(referencedMessageId);
+            } else {
+                Timer timer = unstableSentMessagesTimer.remove(referencedMessageId);
+                if (timer != null) {
+                    ackMap.remove(referencedMessageId);
+                    timer.cancel();
+                }
             }
         }
     }
@@ -217,6 +225,7 @@ public class ReliabilityLayer {
                 }
             }
         }, TIMEOUT_RESEND, TIMEOUT_RESEND);
+        unstableSentMessagesTimer.put(messageToCheck.messageID, timer);
     }
 
     public void sendViewMessage(List<UUID> destinations, ViewManagerMessage message) {

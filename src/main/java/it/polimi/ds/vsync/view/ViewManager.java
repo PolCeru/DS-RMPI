@@ -98,6 +98,7 @@ public class ViewManager {
                             waitingHosts.remove(message.senderUid);
                             assert waitingHosts.isEmpty();
                             connectedHosts.add(message.senderUid);
+                            confirmBuffer.add(message);
                         }
                         case CONNECT_REQ -> {
                             //received by group member from the new host when it's connected
@@ -107,6 +108,7 @@ public class ViewManager {
                             connectedHosts.add(message.senderUid);
                             reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()),
                                     new ConfirmViewChangeMessage(clientUID, ViewChangeType.NEW_HOST));
+                            viewChangeList = null;
                         }
                         case RESTART_VIEW -> {
                             confirmBuffer.add(message);
@@ -166,10 +168,6 @@ public class ViewManager {
                     viewChangeList = ViewChangeList.fromExpectedUsers(Collections.singletonList(message.newHostId));
                 else System.err.println("Received NEW_HOST message while view change list not null");
                 handleNewHost(message.newHostId, message.newHostRandom, message.newHostAddress);
-            }
-            case ADVERTISE -> {
-                AdvertiseMessage message = (AdvertiseMessage) baseMessage;
-                handleNewHost(message.newHostId, Integer.MAX_VALUE, message.newHostAddress);
             }
             case CONNECT_REQ -> {
                 //received by new host from non view manager if group already present
@@ -286,25 +284,42 @@ public class ViewManager {
             }
         } else if (realViewManager.isEmpty()) { //what to do when you are the real manager
             //TODO: handle creation logic and propagation of the view
-            startFreezeView();
             waitingHosts.add(newHostId);
+            startFreezeView();
             communicationLayer.initConnection(newHostAddress, newHostId);
+            AcknowledgeMap acknowledgeMap = new AcknowledgeMap();
+            //sent init view message to new host
+            InitialTopologyMessage initialTopologyMessage = new InitialTopologyMessage(clientUID, clientsProcessIDCounter++, getCompleteTopology());
             reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId),
-                    new InitialTopologyMessage(clientUID, clientsProcessIDCounter++, getCompleteTopology()));
-
-            NewHostMessage message = new NewHostMessage(newHostAddress, newHostId,
+                    initialTopologyMessage);
+            acknowledgeMap.sendMessage(initialTopologyMessage.uuid, Collections.singletonList(newHostId));
+            //sent new host message to all other hosts
+            NewHostMessage newHostMessage = new NewHostMessage(newHostAddress, newHostId,
                     newHostRandom);
-            sendBroadcastAndWaitConfirms(message);
+            reliabilityLayer.sendViewMessage(connectedHosts, newHostMessage);
+            acknowledgeMap.sendMessage(newHostMessage.uuid, connectedHosts);
+            //wait for all confirms
+            while (!acknowledgeMap.isComplete(newHostMessage.uuid) || !acknowledgeMap.isComplete(initialTopologyMessage.uuid)) {
+                try {
+                    ConfirmViewChangeMessage confirmMessage = confirmBuffer.take();
+                    if (confirmMessage.confirmedAction == initialTopologyMessage.messageType) {
+                        acknowledgeMap.receiveAck(initialTopologyMessage.uuid, confirmMessage.senderUid, connectedHosts);
+                    } else if (confirmMessage.confirmedAction == newHostMessage.messageType) {
+                        acknowledgeMap.receiveAck(newHostMessage.uuid, confirmMessage.senderUid, connectedHosts);
+                    } else {
+                        System.err.println("Unexpected confirm for action " + confirmMessage.confirmedAction);
+                    }
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
             RestartViewMessage restartViewMessage = new RestartViewMessage();
             sendBroadcastAndWaitConfirms(restartViewMessage);
             endViewFreeze();
-        } else if (viewChangeList != null) {
+        } else if (viewChangeList != null) { //you received a NEW_HOST message
             startConnection(newHostId, newHostAddress);
             reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId),
                     new ConnectRequestMessage(clientUID));
-        } else {
-            //reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new AdvertiseMessage(newHostAddress,
-            //        newHostId));
         }
     }
 
