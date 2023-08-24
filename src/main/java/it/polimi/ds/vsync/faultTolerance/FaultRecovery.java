@@ -48,7 +48,7 @@ public class FaultRecovery {
      * in case the log in the checkpointsToAdd is not empty it adds the messages in the log in the correct order
      * @param checkpointsToAdd the recovery packet containing the checkpoint and the log
      */
-    public void addCheckpoints(ArrayList<Checkpoint> checkpointsToAdd){
+    public void addMissingCheckpoints(ArrayList<Checkpoint> checkpointsToAdd){
         checkpoints.addAll(checkpointsToAdd);
         checkpoints.sort(Comparator.comparingInt(Checkpoint::getCheckpointID));
         checkpointCounter = Math.max(checkpoints.get(checkpoints.size() - 1).getCheckpointID(), checkpointCounter) + 1;
@@ -59,9 +59,8 @@ public class FaultRecovery {
     /**
      * This method creates a new checkpoint writing it into disk and emptying the log; then adds it to the list of
      * checkpoints incrementing the counter
-     * @return the created checkpoint
      */
-    public Checkpoint doCheckpoint(){
+    public void doCheckpoint(){
         List<byte[]> byteList = log.stream().map(vSyncWrapper -> gson.toJson(vSyncWrapper.message).getBytes()).toList();
         Checkpoint checkpoint = new Checkpoint(checkpointCounter, byteList);
         writeCheckpointOnFile(byteList);
@@ -70,7 +69,6 @@ public class FaultRecovery {
         logger.info("Checkpoint " + (checkpointCounter) + " created successfully");
         logger.trace("Log cleared after checkpoint " + (checkpointCounter));
         checkpointCounter++;
-        return checkpoint;
     }
 
     /**

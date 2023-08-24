@@ -7,7 +7,6 @@ import it.polimi.ds.reliability.ReliabilityLayer;
 import it.polimi.ds.reliability.ReliabilityMessage;
 import it.polimi.ds.utils.StablePriorityBlockingQueue;
 import it.polimi.ds.vsync.VSyncLayer;
-import it.polimi.ds.vsync.faultTolerance.Checkpoint;
 import it.polimi.ds.vsync.faultTolerance.FaultRecovery;
 import it.polimi.ds.vsync.view.message.*;
 import org.apache.logging.log4j.LogManager;
@@ -196,10 +195,7 @@ public class ViewManager {
             }
             case CHECKPOINT -> {
                 //received by group member from manager when a new checkpoint is created
-                CheckpointMessage message = (CheckpointMessage) baseMessage;
-                ArrayList<Checkpoint> checkpointList = new ArrayList<>();
-                checkpointList.add(message.checkpoint);
-                faultRecovery.addCheckpoints(checkpointList);
+                faultRecovery.doCheckpoint();
                 reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
                         ViewChangeType.CHECKPOINT));
             }
@@ -315,8 +311,8 @@ public class ViewManager {
     public void handleCheckpoint() {
         if(realViewManager.isEmpty()){
             startFreezeView();
-            Checkpoint checkpointToSend = faultRecovery.doCheckpoint();
-            CheckpointMessage checkpointMessage = new CheckpointMessage(checkpointToSend);
+            faultRecovery.doCheckpoint();
+            CheckpointMessage checkpointMessage = new CheckpointMessage();
             sendBroadcastAndWaitConfirms(checkpointMessage);
             new Thread("logConditionChecker"){
                 @Override
