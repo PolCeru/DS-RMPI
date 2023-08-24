@@ -1,14 +1,14 @@
 package it.polimi.ds.vsync.faultTolerance;
 
-import java.util.ArrayList;
+import java.util.List;
 
 public class Checkpoint {
 
     private final int checkpointID;
 
-    private final ArrayList<byte[]> messages;
+    private final List<byte[]> messages;
 
-    public Checkpoint(int checkpointID, ArrayList<byte[]> messages) {
+    public Checkpoint(int checkpointID, List<byte[]> messages) {
         this.checkpointID = checkpointID;
         this.messages = messages;
     }
@@ -17,7 +17,7 @@ public class Checkpoint {
         return checkpointID;
     }
 
-    public ArrayList<byte[]> getMessages() {
+    public List<byte[]> getMessages() {
         return messages;
     }
 

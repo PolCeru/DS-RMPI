@@ -149,7 +149,7 @@ public class ReliabilityLayer {
                 }
             }
             if (toLog) {
-                faultRecovery.logMessage((VSyncMessage) message.getPayload());
+                faultRecovery.logMessage((VSyncMessage) message.getPayload(), message.timestamp);
                 logger.info("Log message: " + message.messageID + " " + message.timestamp);
             }
         }
@@ -226,7 +226,7 @@ public class ReliabilityLayer {
                 List<UUID> list = ackMap.missingAcks(messageToCheck.messageID);
                 if (list.isEmpty()) {
                     if (messageToCheck.getPayload().knowledgeableMessageType == KnowledgeableMessageType.VSYNC) {
-                        faultRecovery.logMessage((VSyncMessage) messageToCheck.getPayload());
+                        faultRecovery.logMessage((VSyncMessage) messageToCheck.getPayload(), messageToCheck.timestamp);
                         logger.info("CD Log message: " + messageToCheck.messageID + " " + messageToCheck.timestamp);
                     }
                     ackMap.remove(messageToCheck.messageID);

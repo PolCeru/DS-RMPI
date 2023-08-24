@@ -1,21 +1,25 @@
 package it.polimi.ds.vsync.faultTolerance;
 
 import com.google.gson.Gson;
+import it.polimi.ds.reliability.ScalarClock;
 import it.polimi.ds.vsync.VSyncLayer;
 import it.polimi.ds.vsync.VSyncMessage;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.*;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class FaultRecovery {
+
+    private final static Logger logger = LogManager.getLogger();
     private final VSyncLayer vSyncLayer;
 
-    private final ArrayList<byte[]> log = new ArrayList<>();
+    private final SortedSet<VSyncWrapper> log = new TreeSet<>();
 
     private final ArrayList<Checkpoint> checkpoints = new ArrayList<>();
 
@@ -48,7 +52,6 @@ public class FaultRecovery {
         checkpoints.addAll(checkpointsToAdd);
         checkpoints.sort(Comparator.comparingInt(Checkpoint::getCheckpointID));
         checkpointCounter = Math.max(checkpoints.get(checkpoints.size() - 1).getCheckpointID(), checkpointCounter) + 1;
-
         checkpointsToAdd.forEach(checkpoint -> writeCheckpointOnFile(checkpoint.getMessages()));
         log.clear();
     }
@@ -59,12 +62,13 @@ public class FaultRecovery {
      * @return the created checkpoint
      */
     public Checkpoint doCheckpoint(){
-        Checkpoint checkpoint = new Checkpoint(checkpointCounter, log);
-        writeCheckpointOnFile(log);
+        List<byte[]> byteList = log.stream().map(vSyncWrapper -> gson.toJson(vSyncWrapper.message).getBytes()).toList();
+        Checkpoint checkpoint = new Checkpoint(checkpointCounter, byteList);
+        writeCheckpointOnFile(byteList);
         checkpoints.add(checkpoint);
         log.clear();
-        System.out.println("Checkpoint " + (checkpointCounter) + " created successfully");
-        System.out.println("Log cleared after checkpoint " + (checkpointCounter));
+        logger.info("Checkpoint " + (checkpointCounter) + " created successfully");
+        logger.trace("Log cleared after checkpoint " + (checkpointCounter));
         checkpointCounter++;
         return checkpoint;
     }
@@ -89,31 +93,31 @@ public class FaultRecovery {
     }
 
     /**
-     * This method adds the message to the log and if the log is full starts the checkpoint procedure
-     * @param message the message to be added to the log
-     */
-    public void logMessage(VSyncMessage message){
-        lock.lock();
-        try {
-            log.add(gson.toJson(message).getBytes());
-            thresholdCondition.signalAll();
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    /**
      * This method writes the checkpoints on the disk
      * @param whatToWrite the checkpoints to be written in form of list of byte array
      */
-    private void writeCheckpointOnFile(ArrayList<byte[]> whatToWrite) {
-        System.out.println("Writing checkpoint " + checkpointCounter + " to file");
+    private void writeCheckpointOnFile(List<byte[]> whatToWrite) {
+        logger.debug("Writing checkpoint " + checkpointCounter + " to file");
         try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(FILE_PATH))) {
             for (byte[] row: whatToWrite)
                 bos.write(row);
         } catch (IOException e) {
-            System.err.println("Error writing checkpoint to file\n" + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error writing checkpoint to file\n" + e.getMessage());
+            logger.error(e.getStackTrace());
+        }
+    }
+
+    /**
+     * This method adds the message to the log and if the log is full starts the checkpoint procedure
+     * @param message the message to be added to the log
+     */
+    public void logMessage(VSyncMessage message, ScalarClock timestamp) {
+        lock.lock();
+        try {
+            log.add(new VSyncWrapper(message, timestamp));
+            thresholdCondition.signalAll();
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -129,6 +133,13 @@ public class FaultRecovery {
             throw new RuntimeException(e);
         } finally {
             lock.unlock();
+        }
+    }
+
+    private record VSyncWrapper(VSyncMessage message, ScalarClock timestamp) implements Comparable<VSyncWrapper> {
+        @Override
+        public int compareTo(VSyncWrapper o) {
+            return timestamp.compareTo(o.timestamp);
         }
     }
 }
