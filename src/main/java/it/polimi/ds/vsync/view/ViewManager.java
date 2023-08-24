@@ -263,6 +263,7 @@ public class ViewManager {
                 logger.info("New host:" + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
             }
         } else if (realViewManager.isEmpty()) { //what to do when you are the real manager
+            handleCheckpoint();
             //TODO: handle creation logic and propagation of the view
             waitingHosts.add(newHostId);
             startFreezeView();
