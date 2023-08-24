@@ -128,6 +128,7 @@ public class ViewManager {
                         handleNewConnection(message.viewManagerId);
                         isConnected = true;
                         reliabilityLayer.startMessageSending();
+                        processID = message.destinationProcessID;
                     } else {
                         //TODO implement method that create a waitingList with provided list,
                         // confirm that's ready to viewManager and wait for all connections
@@ -135,6 +136,7 @@ public class ViewManager {
                         else viewChangeList.setExpectedUsers(message.topology);
                         //add the view manager to the connected list
                         handleNewConnection(message.viewManagerId);
+                        processID = message.destinationProcessID;
                         viewChangeList.addConnectedUser(message.viewManagerId);
                         //add all the others clients
                         while (!viewChangeList.isComplete()) {
@@ -224,46 +226,6 @@ public class ViewManager {
     }
 
     /**
-     * Test method, used temporary to start the library functionality of this class
-     * TODO remove and add proper server functionality
-     */
-    public void start() {
-        try {
-            System.out.println("Starting host with address " + InetAddress.getLocalHost().getHostAddress() + ", " +
-                    "random " + random + " and uuid " + clientUID);
-        } catch (UnknownHostException e) {
-            throw new RuntimeException(e);
-        }
-        communicationLayer.startDiscoverySender(clientUID, random);
-    }
-
-    private ViewManagerMessage getMessage() throws InterruptedException {
-        return (ViewManagerMessage) buffer.retrieveStable().payload;
-    }
-
-    /**
-     * Called by FaultRecovery when the log threshold is reached, stops the sending of messages and starts the
-     * stabilisation phase and the checkpointing (with doCheckpoint)
-     */
-    public void handleCheckpoint() {
-        if(realViewManager.isEmpty()){
-            startFreezeView();
-            Checkpoint checkpointToSend = faultRecovery.doCheckpoint();
-            CheckpointMessage checkpointMessage = new CheckpointMessage(checkpointToSend);
-            sendBroadcastAndWaitConfirms(checkpointMessage);
-            new Thread("logConditionChecker"){
-                @Override
-                public void run() {
-                    faultRecovery.checkCondition();
-                }
-            }.start();
-            RestartViewMessage restartViewMessage = new RestartViewMessage();
-            sendBroadcastAndWaitConfirms(restartViewMessage);
-            endViewFreeze();
-        }
-    }
-
-    /**
      * Handle what happen when a new host is detected over the broadcast network
      *
      * @param newHostId      the new host UUID
@@ -284,7 +246,7 @@ public class ViewManager {
                 communicationLayer.stopDiscoverySender();
                 startConnection(newHostId, newHostAddress);
                 reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId),
-                        new InitialTopologyMessage(clientUID, clientsProcessIDCounter++, getCompleteTopology()));
+                        new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology()));
             } else {
                 logger.info("New host:" + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
             }
@@ -295,7 +257,7 @@ public class ViewManager {
             communicationLayer.initConnection(newHostAddress, newHostId);
             AcknowledgeMap acknowledgeMap = new AcknowledgeMap();
             //sent init view message to new host
-            InitialTopologyMessage initialTopologyMessage = new InitialTopologyMessage(clientUID, clientsProcessIDCounter++, getCompleteTopology());
+            InitialTopologyMessage initialTopologyMessage = new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology());
             reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId),
                     initialTopologyMessage);
             acknowledgeMap.sendMessage(initialTopologyMessage.uuid, Collections.singletonList(newHostId));
@@ -327,6 +289,46 @@ public class ViewManager {
             reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId),
                     new ConnectRequestMessage(clientUID));
         }
+    }
+
+    private ViewManagerMessage getMessage() throws InterruptedException {
+        return (ViewManagerMessage) buffer.retrieveStable().payload;
+    }
+
+    /**
+     * Called by FaultRecovery when the log threshold is reached, stops the sending of messages and starts the
+     * stabilisation phase and the checkpointing (with doCheckpoint)
+     */
+    public void handleCheckpoint() {
+        if(realViewManager.isEmpty()){
+            startFreezeView();
+            Checkpoint checkpointToSend = faultRecovery.doCheckpoint();
+            CheckpointMessage checkpointMessage = new CheckpointMessage(checkpointToSend);
+            sendBroadcastAndWaitConfirms(checkpointMessage);
+            new Thread("logConditionChecker"){
+                @Override
+                public void run() {
+                    faultRecovery.checkCondition();
+                }
+            }.start();
+            RestartViewMessage restartViewMessage = new RestartViewMessage();
+            sendBroadcastAndWaitConfirms(restartViewMessage);
+            endViewFreeze();
+        }
+    }
+
+    /**
+     * Test method, used temporary to start the library functionality of this class
+     * TODO remove and add proper server functionality
+     */
+    public void start() {
+        try {
+            logger.info("Starting host with address " + InetAddress.getLocalHost().getHostAddress() + ", " +
+                    "random " + random + " and uuid " + clientUID);
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        }
+        communicationLayer.startDiscoverySender(clientUID, random);
     }
 
     public UUID getClientUID() {
