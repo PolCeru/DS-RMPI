@@ -186,7 +186,6 @@ public class ViewManager {
                 endViewFreeze();
             }
             case CHECKPOINT -> {
-                //TODO: Save the checkpoint on the disk
                 CheckpointMessage message = (CheckpointMessage) baseMessage;
                 ArrayList<Checkpoint> checkpointList = new ArrayList<>();
                 checkpointList.add(message.checkpoint);
@@ -247,10 +246,14 @@ public class ViewManager {
         if(realViewManager.isEmpty()){
             startFreezeView();
             Checkpoint checkpointToSend = faultRecovery.doCheckpoint();
-            //TODO: send checkpoint message to everyone else
-            // crea il messaggio, aggiungilo al confirm buffer
             CheckpointMessage checkpointMessage = new CheckpointMessage(checkpointToSend);
             sendBroadcastAndWaitConfirms(checkpointMessage);
+            new Thread("logConditionChecker"){
+                @Override
+                public void run() {
+                    faultRecovery.checkCondition();
+                }
+            }.start();
             RestartViewMessage restartViewMessage = new RestartViewMessage();
             sendBroadcastAndWaitConfirms(restartViewMessage);
             endViewFreeze();

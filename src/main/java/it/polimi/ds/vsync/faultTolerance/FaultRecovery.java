@@ -36,9 +36,6 @@ public class FaultRecovery {
         this.lock = new ReentrantLock();
         this.thresholdCondition = lock.newCondition();
         new Thread(this::checkCondition, "logConditionChecker").start();
-        //TODO: crea un thread che è sempre in ascolto di chiamata a "logMessage" (=notify) e aspetta (wait) che il log
-        // sia pieno e dopo di che chiama handleCheckpoint del viewManager
-        // quando il checkpoint è finito fai ripartire il thread (con una flag o restart thread)
     }
 
     /**
