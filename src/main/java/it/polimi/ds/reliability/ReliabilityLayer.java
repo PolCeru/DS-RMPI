@@ -9,12 +9,16 @@ import it.polimi.ds.vsync.faultTolerance.FaultRecovery;
 import it.polimi.ds.vsync.view.ViewManager;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
 import it.polimi.ds.vsync.view.message.ViewManagerMessage;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class ReliabilityLayer {
+
+    private final static Logger logger = LogManager.getLogger();
 
     /**
      * Maximum number of retries before considering a client disconnected
@@ -38,7 +42,7 @@ public class ReliabilityLayer {
 
     private final Map<UUID, ReliabilityMessage> unstableReceivedMessages = new HashMap<>();
 
-    private final Map<UUID, Timer> unstableSentMessagesTimer = new HashMap<>();
+    private final Map<UUID, MessageTimer> unstableSentMessagesTimer = new HashMap<>();
 
     /**
      * Map of messages and their number of retries
@@ -83,10 +87,10 @@ public class ReliabilityLayer {
             UUID senderUID = dataMessage.senderUID;
             ReliabilityMessage messageReceived = dataMessage.payload;
             if (messageReceived.messageType == MessageType.ACK)
-                System.out.println("Received " + messageReceived.messageType + " message with ID " +
+                logger.trace("Received " + messageReceived.messageType + " message with ID " +
                         messageReceived.messageID + " for message " + messageReceived.referenceMessageID + " from " + senderUID);
             else
-                System.out.println("Received " + messageReceived.messageType + " message with ID " +
+                logger.trace("Received " + messageReceived.messageType + " message with ID " +
                         messageReceived.messageID + " from " + senderUID);
 
             //Checks which scalar clock is higher and updates the eventID
@@ -98,7 +102,7 @@ public class ReliabilityLayer {
                 ackMap.receiveAck(referencedMessageId, senderUID, viewManager.getConnectedClients());
 
                 //if all clients have acknowledged the message, remove it from the ackMap
-                checkReceivedStable(referencedMessageId);
+                checkStable(referencedMessageId);
             } else {
                 List<UUID> uuids;
                 if (messageReceived.messageType == MessageType.DATA) {
@@ -115,26 +119,36 @@ public class ReliabilityLayer {
                     upBuffer.add(messageReceived);
                 }
                 unstableReceivedMessages.put(messageReceived.messageID, messageReceived);
-                checkReceivedStable(messageReceived.messageID);
+                checkStable(messageReceived.messageID);
             }
         }
     }
 
-    private void checkReceivedStable(UUID referencedMessageId) {
+    private void checkStable(UUID referencedMessageId) {
         if (ackMap.isComplete(referencedMessageId)) {
+            boolean toLog = false;
             ReliabilityMessage message = unstableReceivedMessages.remove(referencedMessageId);
             if (message != null) {
                 if (message.payload.knowledgeableMessageType == KnowledgeableMessageType.VIEW)
                     viewManager.getBuffer().markStable(message);
-                else
+                else {
                     upBuffer.markStable(message);
+                    toLog = true;
+                }
                 ackMap.remove(referencedMessageId);
             } else {
-                Timer timer = unstableSentMessagesTimer.remove(referencedMessageId);
-                if (timer != null) {
+                MessageTimer messageTimer = unstableSentMessagesTimer.remove(referencedMessageId);
+                if (messageTimer != null) {
                     ackMap.remove(referencedMessageId);
-                    timer.cancel();
+                    messageTimer.timer.cancel();
+                    message = messageTimer.message;
+                    if (messageTimer.message.payload.knowledgeableMessageType == KnowledgeableMessageType.VSYNC) {
+                        toLog = true;
+                    }
                 }
+            }
+            if (toLog) {
+                logger.info("Log message: " + message.messageID + " " + message.timestamp);
             }
         }
     }
@@ -145,11 +159,11 @@ public class ReliabilityLayer {
                 timestamp);
         if (messageReceived.messageType == MessageType.SINGLE) {
             handler.sendMessage(senderUID, ackMessage);
-            System.out.println("Sent ACK for message " + messageReceived.messageID + " with id "
+            logger.trace("Sent ACK for message " + messageReceived.messageID + " with id "
                     + ackMessageUID + " to " + senderUID);
         } else {
             handler.sendMessageBroadcast(ackMessage);
-            System.out.println("Sent ACK for message" + messageReceived.messageID + " with id "
+            logger.trace("Sent ACK for message" + messageReceived.messageID + " with id "
                     + ackMessageUID + " to all clients");
         }
     }
@@ -173,7 +187,7 @@ public class ReliabilityLayer {
             }
             try {
                 ReliabilityMessage message = downBuffer.take();
-                System.out.println("Sending VSync message with ID " + message.messageID + " to all clients");
+                logger.debug("Sending VSync message with ID " + message.messageID + " to all clients");
                 handler.sendMessageBroadcast(message);
                 ackMap.sendMessage(message.messageID, viewManager.getConnectedClients());
                 checkDelivery(message);
@@ -206,8 +220,10 @@ public class ReliabilityLayer {
             public void run() {
                 List<UUID> list = ackMap.missingAcks(messageToCheck.messageID);
                 if (list.isEmpty()) {
-                    if(messageToCheck.getPayload().knowledgeableMessageType == KnowledgeableMessageType.VSYNC)
+                    if (messageToCheck.getPayload().knowledgeableMessageType == KnowledgeableMessageType.VSYNC) {
                         faultRecovery.logMessage((VSyncMessage) messageToCheck.getPayload());
+                        logger.info("CD Log message: " + messageToCheck.messageID + " " + messageToCheck.timestamp);
+                    }
                     ackMap.remove(messageToCheck.messageID);
                     timer.cancel();
                 } else {
@@ -223,7 +239,7 @@ public class ReliabilityLayer {
                 }
             }
         }, TIMEOUT_RESEND, TIMEOUT_RESEND);
-        unstableSentMessagesTimer.put(messageToCheck.messageID, timer);
+        unstableSentMessagesTimer.put(messageToCheck.messageID, new MessageTimer(timer, messageToCheck));
     }
 
     public void sendViewMessage(List<UUID> destinations, ViewManagerMessage message) {
@@ -236,7 +252,7 @@ public class ReliabilityLayer {
         }
         ackMap.sendMessage(messageToSend.messageID, destinations);
         for (UUID destination : destinations) {
-            System.out.println("Sent message " + message.messageType + " with ID " + messageToSend.messageID + " to " + destination);
+            logger.debug("Sent message " + message.messageType + " with ID " + messageToSend.messageID + " to " + destination);
             handler.sendMessage(destination, messageToSend);
         }
         checkDelivery(messageToSend);
@@ -282,5 +298,9 @@ public class ReliabilityLayer {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private record MessageTimer(Timer timer, ReliabilityMessage message) {
+
     }
 }

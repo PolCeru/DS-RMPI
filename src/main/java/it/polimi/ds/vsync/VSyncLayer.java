@@ -5,6 +5,7 @@ import it.polimi.ds.vsync.faultTolerance.FaultRecovery;
 import it.polimi.ds.vsync.view.ViewManager;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
 
+import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -27,7 +28,8 @@ public class VSyncLayer {
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                handler.sendMessage(new VSyncMessage("test".getBytes()));
+                int random = new Random().nextInt(1);
+                if (random == 0) handler.sendMessage(new VSyncMessage("test".getBytes()));
             }
         }, 10000, 4000);
     }

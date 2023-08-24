@@ -8,6 +8,8 @@ import it.polimi.ds.reliability.ReliabilityMessage;
 import it.polimi.ds.utils.MessageGsonBuilder;
 import it.polimi.ds.vsync.view.ViewManager;
 import it.polimi.ds.vsync.view.ViewManagerBuilder;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -47,6 +49,8 @@ public class CommunicationLayer {
      * Default broadcast address
      */
     private static final String BROADCAST_ADDR = "255.255.255.255";
+
+    private final static Logger logger = LogManager.getLogger(CommunicationLayer.class);
 
     /**
      * Default communication port
@@ -198,7 +202,7 @@ public class CommunicationLayer {
                 DataMessage message = (DataMessage) decodeMessage(buffer, length);
                 upBuffer.add(message);
                 addClient(message.senderUID, socket);
-                System.out.println("Received connection with " + socket.getInetAddress().getHostAddress());
+                logger.debug("Received connection with " + socket.getInetAddress().getHostAddress());
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -240,7 +244,7 @@ public class CommunicationLayer {
             new Thread(clientHandler).start();
             if (!isConnected) isConnected = !isConnected;
             latch.countDown();
-            System.out.println("Create client handler with " + socket.getInetAddress().getHostAddress());
+            logger.info("Create client handler with " + socket.getInetAddress().getHostAddress());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -293,7 +297,7 @@ public class CommunicationLayer {
             try {
                 DatagramPacket packet = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(BROADCAST_ADDR), port);
                 broadcastSocket.send(packet);
-                System.out.println("Broadcast message sent");
+                logger.trace("Broadcast message sent");
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
