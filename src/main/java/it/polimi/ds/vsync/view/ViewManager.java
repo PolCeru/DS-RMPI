@@ -12,6 +12,9 @@ import it.polimi.ds.vsync.view.message.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
@@ -130,6 +133,7 @@ public class ViewManager {
                         isConnected = true;
                         reliabilityLayer.startMessageSending();
                         processID = message.destinationProcessID;
+                        saveDataOnDisk(clientUID, processID, random);
                     } else {
                         //TODO implement method that create a waitingList with provided list,
                         // confirm that's ready to viewManager and wait for all connections
@@ -138,6 +142,7 @@ public class ViewManager {
                         //add the view manager to the connected list
                         handleNewConnection(message.viewManagerId);
                         processID = message.destinationProcessID;
+                        saveDataOnDisk(clientUID, processID, random);
                         viewChangeList.addConnectedUser(message.viewManagerId);
                         //add all the others clients
                         while (!viewChangeList.isComplete()) {
@@ -250,6 +255,7 @@ public class ViewManager {
                 if (realViewManager.isEmpty()) {
                     processID = 1;
                     clientsProcessIDCounter = 1;
+                    saveDataOnDisk(clientUID, processID, random);
                 }
                 communicationLayer.stopDiscoverySender();
                 startConnection(newHostId, newHostAddress);
@@ -398,6 +404,19 @@ public class ViewManager {
             }
         }
         logger.trace("Received all confirms for " + message.messageType);
+    }
+
+    private void saveDataOnDisk(UUID clientUID, int processID, int random) {
+        String FILE_PATH = "checkpoints/_recovery.txt";
+        try {
+            BufferedWriter writer = new BufferedWriter(new FileWriter(FILE_PATH));
+            writer.write("ClientUID: " + clientUID + "; ProcessID: " + processID + "; Random: " + random + "\n");
+            writer.close();
+            logger.info("Saved recovery data (ClientUID: " + clientUID + "; ProcessID: " + processID + "; Random: "
+                    + random + "to the disk");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public StablePriorityBlockingQueue<ReliabilityMessage> getBuffer() {
