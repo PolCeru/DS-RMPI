@@ -322,8 +322,10 @@ public class CommunicationLayer {
         return latch;
     }
 
-    public void disconnectClient(UUID clientID) {
-        //TODO: implement
+    public void disconnectClient(UUID clientUID) {
+        connectedClients.remove(clientUID);
+        isConnected = false;
+        viewManager.handleDisconnection(clientUID);
     }
 
     public boolean isConnected() {

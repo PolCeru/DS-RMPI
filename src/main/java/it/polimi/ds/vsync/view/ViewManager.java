@@ -98,6 +98,8 @@ public class ViewManager {
                                 confirmBuffer.add(message);
                         case CHECKPOINT -> //received by manager when a group member received the checkpoint
                                 confirmBuffer.add(message);
+                        case DISCONNECTED_CLIENT -> //received by manager when a group member knows that someone disconnected
+                                confirmBuffer.add(message);
                         case INIT_VIEW -> {
                             waitingHosts.remove(message.senderUid);
                             assert waitingHosts.isEmpty();
@@ -160,6 +162,7 @@ public class ViewManager {
                         ViewChangeType.INIT_VIEW));
             }
             case FREEZE_VIEW -> {
+                //received by group member from manager when the view is frozen
                 reliabilityLayer.stopMessageSending();
                 reliabilityLayer.waitStabilization();
                 logger.debug("Freeze view complete");
@@ -186,17 +189,26 @@ public class ViewManager {
                         new ConfirmViewChangeMessage(clientUID, ViewChangeType.CONNECT_REQ));
             }
             case RESTART_VIEW -> {
+                //received by group member from manager when the view is restarted
                 reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
                         ViewChangeType.RESTART_VIEW));
                 endViewFreeze();
             }
             case CHECKPOINT -> {
+                //received by group member from manager when a new checkpoint is created
                 CheckpointMessage message = (CheckpointMessage) baseMessage;
                 ArrayList<Checkpoint> checkpointList = new ArrayList<>();
                 checkpointList.add(message.checkpoint);
                 faultRecovery.addCheckpoints(checkpointList);
                 reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
                         ViewChangeType.CHECKPOINT));
+            }
+            case DISCONNECTED_CLIENT -> {
+                //received by group member from manager when a client disconnects
+                DisconnectedClientMessage message = (DisconnectedClientMessage) baseMessage;
+                connectedHosts.remove(message.disconnectedClientUID);
+                reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
+                        ViewChangeType.DISCONNECTED_CLIENT));
             }
             //TODO: case RECOVER_REQUEST e RECOVERY_PACKET, (remember to start a checkpoint when a user
             // disconnects/connects)
@@ -314,6 +326,16 @@ public class ViewManager {
             RestartViewMessage restartViewMessage = new RestartViewMessage();
             sendBroadcastAndWaitConfirms(restartViewMessage);
             endViewFreeze();
+        }
+    }
+
+    public void handleDisconnection(UUID clientUID){
+        if(realViewManager.isEmpty()){
+            connectedHosts.remove(clientUID);
+            DisconnectedClientMessage disconnectedClientMessage = new DisconnectedClientMessage(clientUID);
+            sendBroadcastAndWaitConfirms(disconnectedClientMessage);
+            logger.info("disconnected client " + clientUID);
+            handleCheckpoint();
         }
     }
 

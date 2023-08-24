@@ -6,6 +6,7 @@ public enum ViewChangeType {
     CHECKPOINT("CheckpointMessage"),
     FREEZE_VIEW("FreezeViewMessage"),
     CONNECT_REQ("ConnectRequestMessage"),
+    DISCONNECTED_CLIENT("DisconnectedClientMessage"),
     NEW_HOST("NewHostMessage"),
     RESTART_VIEW("RestartViewMessage");
     public final String className;
