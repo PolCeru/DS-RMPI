@@ -265,10 +265,10 @@ public class ViewManager {
                 logger.info("New host:" + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
             }
         } else if (realViewManager.isEmpty()) { //what to do when you are the real manager
-            handleCheckpoint();
             //TODO: handle creation logic and propagation of the view
             waitingHosts.add(newHostId);
             startFreezeView();
+            handleCheckpoint();
             communicationLayer.initConnection(newHostAddress, newHostId);
             AcknowledgeMap acknowledgeMap = new AcknowledgeMap();
             //sent init view message to new host
@@ -316,7 +316,6 @@ public class ViewManager {
      */
     public void handleCheckpoint() {
         if(realViewManager.isEmpty()){
-            startFreezeView();
             faultRecovery.doCheckpoint();
             CheckpointMessage checkpointMessage = new CheckpointMessage();
             sendBroadcastAndWaitConfirms(checkpointMessage);
@@ -326,15 +325,20 @@ public class ViewManager {
                     faultRecovery.checkCondition();
                 }
             }.start();
-            RestartViewMessage restartViewMessage = new RestartViewMessage();
-            sendBroadcastAndWaitConfirms(restartViewMessage);
-            endViewFreeze();
         }
     }
 
     public void handleDisconnection(UUID clientUID){
         if(realViewManager.isEmpty()){
             connectedHosts.remove(clientUID);
+    public void freezeAndCheckpoint(){
+        startFreezeView();
+        handleCheckpoint();
+        RestartViewMessage restartViewMessage = new RestartViewMessage();
+        sendBroadcastAndWaitConfirms(restartViewMessage);
+        endViewFreeze();
+    }
+
             DisconnectedClientMessage disconnectedClientMessage = new DisconnectedClientMessage(clientUID);
             sendBroadcastAndWaitConfirms(disconnectedClientMessage);
             logger.info("disconnected client " + clientUID);

@@ -126,7 +126,7 @@ public class FaultRecovery {
                 // Wait for the log to reach the threshold to call handleCheckpoint
                 thresholdCondition.await();
             }
-            vSyncLayer.getViewManager().handleCheckpoint();
+            vSyncLayer.getViewManager().freezeAndCheckpoint();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
