@@ -12,9 +12,7 @@ import it.polimi.ds.vsync.view.message.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
@@ -26,12 +24,16 @@ public class ViewManager {
     /**
      * Random number used by the protocol to decide which device is the master and should start the connection
      */
-    private final int random = new Random().nextInt();
+    private final int random;
 
     /**
      * Identify this machine uniquely
      */
-    private final UUID clientUID = UUID.randomUUID();
+    private final UUID clientUID;
+
+    private int processID;
+
+    private int clientsProcessIDCounter;
 
     private final CommunicationLayer communicationLayer;
 
@@ -57,13 +59,45 @@ public class ViewManager {
     private final BlockingQueue<ConfirmViewChangeMessage> confirmBuffer = new LinkedBlockingQueue<>();
 
     private ViewChangeList viewChangeList;
+
     private static final Logger logger = LogManager.getLogger();
 
-    public ViewManager(VSyncLayer vSyncLayer, ReliabilityLayer reliabilityLayer,
-                       CommunicationLayer communicationLayer, FaultRecovery faultRecovery) {
+    private final String FILE_PATH = "recovery/recovery.txt";
+
+    private final String P_CLIENT_ID = "ClientID";
+
+    private final String P_PROCESS_ID = "ProcessID";
+
+    private final String P_RANDOM = "Random";
+
+    private final Properties properties = new Properties();
+
+    public ViewManager(VSyncLayer vSyncLayer, ReliabilityLayer reliabilityLayer, CommunicationLayer communicationLayer, FaultRecovery faultRecovery) {
         this.faultRecovery = faultRecovery;
         this.communicationLayer = communicationLayer;
         this.reliabilityLayer = reliabilityLayer;
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(FILE_PATH))) {
+            properties.load(reader);
+            isRecoverable = properties.containsKey(P_CLIENT_ID) &&
+                    properties.containsKey(P_PROCESS_ID) &&
+                    properties.containsKey(P_RANDOM) &&
+                    disconnectedHosts.contains(UUID.fromString(properties.getProperty(P_CLIENT_ID)));
+        } catch (FileNotFoundException e) {
+            logger.debug("No recovery found in directory: " + FILE_PATH);
+            logger.debug("Starting as new client");
+        } catch (IOException e) {
+            logger.debug("There's an error with the BufferedReader " + e.getMessage());
+        }
+
+        if (isRecoverable) {
+            this.clientUID = UUID.fromString(properties.getProperty(P_CLIENT_ID));
+            this.random = Integer.parseInt(properties.getProperty(P_RANDOM));
+        } else {
+            this.clientUID = UUID.randomUUID();
+            this.random = new Random().nextInt();
+        }
+
         new Thread("ViewManager") {
             @Override
             public void run() {
@@ -132,7 +166,9 @@ public class ViewManager {
                         handleNewConnection(message.viewManagerId);
                         isConnected = true;
                         reliabilityLayer.startMessageSending();
-                        processID = message.destinationProcessID;
+                        if (message.destinationProcessID == -1 && isRecoverable)
+                            processID = Integer.parseInt(properties.getProperty(P_PROCESS_ID));
+                        else processID = message.destinationProcessID;
                         saveDataOnDisk(clientUID, processID, random);
                     } else {
                         //TODO implement method that create a waitingList with provided list,
@@ -141,7 +177,9 @@ public class ViewManager {
                         else viewChangeList.setExpectedUsers(message.topology);
                         //add the view manager to the connected list
                         handleNewConnection(message.viewManagerId);
-                        processID = message.destinationProcessID;
+                        if (message.destinationProcessID == -1 && isRecoverable)
+                            processID = Integer.parseInt(properties.getProperty(P_PROCESS_ID));
+                        else processID = message.destinationProcessID;
                         saveDataOnDisk(clientUID, processID, random);
                         viewChangeList.addConnectedUser(message.viewManagerId);
                         //add all the others clients
@@ -206,11 +244,19 @@ public class ViewManager {
             }
             case DISCONNECTED_CLIENT -> {
                 //received by group member from manager when a client disconnects
-                reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
-                        ViewChangeType.DISCONNECTED_CLIENT));
                 handleDisconnection(((DisconnectedClientMessage) baseMessage).disconnectedClientUID);
                 reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID, ViewChangeType.DISCONNECTED_CLIENT));
             }
+            case RECOVERY_REQUEST -> {
+                //received by group member from manager when a client wants to retrieve missing checkpoints
+                RecoveryRequestMessage message = (RecoveryRequestMessage) baseMessage;
+                ArrayList<Checkpoint> checkpoints;
+                if(message.lastCheckpointID >= 0) {
+                    int checkpointID = message.lastCheckpointID;
+                    checkpoints = faultRecovery.recoverCheckpoint(checkpointID);
+                } else checkpoints = new ArrayList<>();
+                reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()),
+                        new RecoveryPacketMessage(checkpoints));
             }
             //TODO: case RECOVER_REQUEST e RECOVERY_PACKET, (remember to start a checkpoint when a user
             // disconnects/connects)
@@ -316,11 +362,11 @@ public class ViewManager {
      * stabilisation phase and the checkpointing (with doCheckpoint)
      */
     public void handleCheckpoint() {
-        if(realViewManager.isEmpty()){
+        if (realViewManager.isEmpty()) {
             faultRecovery.doCheckpoint();
             CheckpointMessage checkpointMessage = new CheckpointMessage();
             sendBroadcastAndWaitConfirms(checkpointMessage);
-            new Thread("logConditionChecker"){
+            new Thread("logConditionChecker") {
                 @Override
                 public void run() {
                     faultRecovery.checkCondition();
@@ -329,7 +375,7 @@ public class ViewManager {
         }
     }
 
-    public void freezeAndCheckpoint(){
+    public void freezeAndCheckpoint() {
         startFreezeView();
         handleCheckpoint();
         RestartViewMessage restartViewMessage = new RestartViewMessage();
@@ -359,8 +405,7 @@ public class ViewManager {
      */
     public void start() {
         try {
-            logger.info("Starting host with address " + InetAddress.getLocalHost().getHostAddress() + ", " +
-                    "random " + random + " and uuid " + clientUID);
+            logger.info("Starting host with address " + InetAddress.getLocalHost().getHostAddress() + ", " + "random " + random + " and uuid " + clientUID);
         } catch (UnknownHostException e) {
             throw new RuntimeException(e);
         }
@@ -418,15 +463,15 @@ public class ViewManager {
     }
 
     private void saveDataOnDisk(UUID clientUID, int processID, int random) {
-        String FILE_PATH = "checkpoints/_recovery.txt";
-        try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter(FILE_PATH));
-            writer.write("ClientUID: " + clientUID + "; ProcessID: " + processID + "; Random: " + random + "\n");
-            writer.close();
-            logger.info("Saved recovery data (ClientUID: " + clientUID + "; ProcessID: " + processID + "; Random: "
-                    + random + "to the disk");
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(FILE_PATH))) {
+            properties.setProperty(P_CLIENT_ID, clientUID.toString());
+            properties.setProperty(P_PROCESS_ID, String.valueOf(processID));
+            properties.setProperty(P_RANDOM, String.valueOf(random));
+            properties.store(writer, "Info to recover the client in case of disconnection");
+            logger.info("Saved recovery data (ClientUID: " + clientUID + "; ProcessID: " + processID + "; Random: " + random + "to the disk");
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("Error writing recovery data to file\n" + e.getMessage());
+            logger.error(e.getStackTrace());
         }
     }
 

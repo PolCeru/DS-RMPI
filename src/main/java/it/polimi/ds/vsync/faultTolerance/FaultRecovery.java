@@ -33,7 +33,11 @@ public class FaultRecovery {
     
     private final int LOG_THRESHOLD = 1024;
 
-    private final String FILE_PATH = "checkpoints/Checkpoint" + checkpointCounter + ".bin";
+    private final String CHECKPOINTS_FILE_PATH = "checkpoints/Checkpoint" + checkpointCounter + ".bin";
+
+    public final String RECOVERY_FILE_PATH = "checkpoints/_recoveryCounter.txt";
+
+    private final Properties properties = new Properties();
 
     public FaultRecovery(VSyncLayer vSyncLayer) {
         this.vSyncLayer = vSyncLayer;
@@ -96,9 +100,18 @@ public class FaultRecovery {
      */
     private void writeCheckpointOnFile(List<byte[]> whatToWrite) {
         logger.debug("Writing checkpoint " + checkpointCounter + " to file");
-        try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(FILE_PATH))) {
+        try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(CHECKPOINTS_FILE_PATH))) {
             for (byte[] row: whatToWrite)
                 bos.write(row);
+        } catch (IOException e) {
+            logger.error("Error writing checkpoint to file\n" + e.getMessage());
+            logger.error(e.getStackTrace());
+        }
+
+        logger.debug("Updating Checkpoint counter in the file");
+        properties.setProperty("CheckpointCounter", String.valueOf(checkpointCounter));
+        try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(RECOVERY_FILE_PATH))) {
+            properties.store(bos, "Checkpoint counter to be used in case of recovery");
         } catch (IOException e) {
             logger.error("Error writing checkpoint to file\n" + e.getMessage());
             logger.error(e.getStackTrace());
@@ -139,5 +152,9 @@ public class FaultRecovery {
         public int compareTo(VSyncWrapper o) {
             return timestamp.compareTo(o.timestamp);
         }
+    }
+
+    public Properties getProperties() {
+        return properties;
     }
 }
