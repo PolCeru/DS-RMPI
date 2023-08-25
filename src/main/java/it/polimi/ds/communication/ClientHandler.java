@@ -60,7 +60,7 @@ public class ClientHandler implements Runnable {
                 outputStream.writeInt(payload.length);
                 outputStream.write(payload);
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                messageHandler.disconnectClient(clientUID);
             }
         }
     }
@@ -80,7 +80,7 @@ public class ClientHandler implements Runnable {
                 DataMessage message = CommunicationLayer.gson.fromJson(new String(payload, StandardCharsets.UTF_8), DataMessage.class);
                 messageHandler.getUpBuffer().add(message);
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                messageHandler.disconnectClient(clientUID);
             }
         }
     }

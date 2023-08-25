@@ -306,8 +306,6 @@ public class ReliabilityLayer {
     }
 
     public void handleDisconnection(UUID clientUID) {
-        //TODO: cercare in lista unstable receive message e timer e rimuovere tutto ciò che è legato a questo
-        // clientUID + svuotare anche reliabilitylayer ackMap con .removeAll()
         unstableReceivedMessages.forEach((uuid, message) -> {
             if(uuid.equals(clientUID))
                 unstableReceivedMessages.remove(uuid);

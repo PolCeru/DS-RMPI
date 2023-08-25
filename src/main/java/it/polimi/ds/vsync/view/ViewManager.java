@@ -208,6 +208,9 @@ public class ViewManager {
                 //received by group member from manager when a client disconnects
                 reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
                         ViewChangeType.DISCONNECTED_CLIENT));
+                handleDisconnection(((DisconnectedClientMessage) baseMessage).disconnectedClientUID);
+                reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID, ViewChangeType.DISCONNECTED_CLIENT));
+            }
             }
             //TODO: case RECOVER_REQUEST e RECOVERY_PACKET, (remember to start a checkpoint when a user
             // disconnects/connects)
