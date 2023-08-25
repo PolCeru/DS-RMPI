@@ -7,6 +7,7 @@ import it.polimi.ds.reliability.ReliabilityLayer;
 import it.polimi.ds.reliability.ReliabilityMessage;
 import it.polimi.ds.utils.StablePriorityBlockingQueue;
 import it.polimi.ds.vsync.VSyncLayer;
+import it.polimi.ds.vsync.faultTolerance.Checkpoint;
 import it.polimi.ds.vsync.faultTolerance.FaultRecovery;
 import it.polimi.ds.vsync.view.message.*;
 import org.apache.logging.log4j.LogManager;
@@ -43,14 +44,14 @@ public class ViewManager {
 
     private boolean isConnected = false;
 
-    private int processID;
-
-    private int clientsProcessIDCounter;
+    private boolean isRecoverable = false;
 
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     private Optional<UUID> realViewManager = Optional.empty();
 
     private final List<UUID> connectedHosts = new LinkedList<>();
+
+    private final List<UUID> disconnectedHosts = new LinkedList<>();
 
     private final List<UUID> waitingHosts = new LinkedList<>();
 
@@ -136,6 +137,8 @@ public class ViewManager {
                                 confirmBuffer.add(message);
                         case DISCONNECTED_CLIENT -> //received by manager when a group member knows that someone disconnected
                                 confirmBuffer.add(message);
+                        case RECOVERY_PACKET ->
+                                endViewFreeze();
                         case INIT_VIEW -> {
                             waitingHosts.remove(message.senderUid);
                             assert waitingHosts.isEmpty();
@@ -200,16 +203,26 @@ public class ViewManager {
                 } else {
                     logger.fatal("Received INIT_VIEW message while already connected");
                 }
-                reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
-                        ViewChangeType.INIT_VIEW));
+                reliabilityLayer.sendViewMessage(List.of(realViewManager.get()),
+                        new ConfirmViewChangeMessage(clientUID, ViewChangeType.INIT_VIEW));
+                //Request missing checkpoints
+                try (BufferedReader reader = new BufferedReader(new FileReader(faultRecovery.RECOVERY_FILE_PATH))) {
+                    faultRecovery.getProperties().load(reader);
+                    int checkpointCounter = Integer.parseInt(faultRecovery.getProperties().getProperty("CheckpointCounter"));
+                    checkpointCounter = checkpointCounter > 0 ? checkpointCounter : -1;
+                    reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new RecoveryRequestMessage(checkpointCounter));
+                } catch (FileNotFoundException e) {
+                    logger.debug("No recovery file found in directory");
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             }
             case FREEZE_VIEW -> {
                 //received by group member from manager when the view is frozen
                 reliabilityLayer.stopMessageSending();
                 reliabilityLayer.waitStabilization();
                 logger.debug("Freeze view complete");
-                reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
-                        ViewChangeType.FREEZE_VIEW));
+                reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new ConfirmViewChangeMessage(clientUID, ViewChangeType.FREEZE_VIEW));
             }
             case NEW_HOST -> {
                 //received by group member from manager when new host try to connect
@@ -232,15 +245,15 @@ public class ViewManager {
             }
             case RESTART_VIEW -> {
                 //received by group member from manager when the view is restarted
-                reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
-                        ViewChangeType.RESTART_VIEW));
+                reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()),
+                        new ConfirmViewChangeMessage(clientUID, ViewChangeType.RESTART_VIEW));
                 endViewFreeze();
             }
             case CHECKPOINT -> {
                 //received by group member from manager when a new checkpoint is created
                 faultRecovery.doCheckpoint();
-                reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID,
-                        ViewChangeType.CHECKPOINT));
+                reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()),
+                        new ConfirmViewChangeMessage(clientUID, ViewChangeType.CHECKPOINT));
             }
             case DISCONNECTED_CLIENT -> {
                 //received by group member from manager when a client disconnects
@@ -258,8 +271,13 @@ public class ViewManager {
                 reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()),
                         new RecoveryPacketMessage(checkpoints));
             }
-            //TODO: case RECOVER_REQUEST e RECOVERY_PACKET, (remember to start a checkpoint when a user
-            // disconnects/connects)
+            case RECOVERY_PACKET -> {
+                //received by group member from manager, it contains the missing checkpoints requested
+                RecoveryPacketMessage message = (RecoveryPacketMessage) baseMessage;
+                faultRecovery.addMissingCheckpoints(message.checkpoints);
+                reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()),
+                        new ConfirmViewChangeMessage(clientUID, ViewChangeType.RECOVERY_PACKET));
+            }
             default -> throw new RuntimeException("Unexpected message type " + baseMessage.messageType);
         }
     }
@@ -306,8 +324,7 @@ public class ViewManager {
                 }
                 communicationLayer.stopDiscoverySender();
                 startConnection(newHostId, newHostAddress);
-                reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId),
-                        new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology()));
+                reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology()));
             } else {
                 logger.info("New host:" + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
             }
@@ -318,14 +335,18 @@ public class ViewManager {
             handleCheckpoint();
             communicationLayer.initConnection(newHostAddress, newHostId);
             AcknowledgeMap acknowledgeMap = new AcknowledgeMap();
+            InitialTopologyMessage initialTopologyMessage;
             //sent init view message to new host
-            InitialTopologyMessage initialTopologyMessage = new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology());
-            reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId),
-                    initialTopologyMessage);
+            if (disconnectedHosts.contains(clientUID) && isRecoverable) {
+                disconnectedHosts.remove(clientUID);
+                connectedHosts.add(clientUID);
+                initialTopologyMessage = new InitialTopologyMessage(clientUID, -1, getCompleteTopology());
+            } else
+                initialTopologyMessage = new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology());
+            reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), initialTopologyMessage);
             acknowledgeMap.sendMessage(initialTopologyMessage.uuid, Collections.singletonList(newHostId));
             //sent new host message to all other hosts
-            NewHostMessage newHostMessage = new NewHostMessage(newHostAddress, newHostId,
-                    newHostRandom);
+            NewHostMessage newHostMessage = new NewHostMessage(newHostAddress, newHostId, newHostRandom);
             reliabilityLayer.sendViewMessage(connectedHosts, newHostMessage);
             acknowledgeMap.sendMessage(newHostMessage.uuid, connectedHosts);
             //wait for all confirms
@@ -343,9 +364,11 @@ public class ViewManager {
                     throw new RuntimeException(e);
                 }
             }
-            RestartViewMessage restartViewMessage = new RestartViewMessage();
-            sendBroadcastAndWaitConfirms(restartViewMessage);
-            endViewFreeze();
+            if (!isRecoverable) {
+                RestartViewMessage restartViewMessage = new RestartViewMessage();
+                sendBroadcastAndWaitConfirms(restartViewMessage);
+                endViewFreeze();
+            }
         } else if (viewChangeList != null) { //you received a NEW_HOST message
             startConnection(newHostId, newHostAddress);
             reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId),
@@ -388,10 +411,14 @@ public class ViewManager {
      *
      * @param clientUID the UUID of the disconnected client
      */
-    public synchronized void handleDisconnection(UUID clientUID){
-        reliabilityLayer.handleDisconnection(clientUID);
-        connectedHosts.remove(clientUID);
-        if(realViewManager.isEmpty()) {
+    public synchronized void handleDisconnection(UUID clientUID) {
+        if (connectedHosts.contains(clientUID)) {
+            reliabilityLayer.stopMessageSending();
+            connectedHosts.remove(clientUID);
+            disconnectedHosts.add(clientUID);
+            reliabilityLayer.handleDisconnection(clientUID);
+        }
+        if (realViewManager.isEmpty()) {
             DisconnectedClientMessage disconnectedClientMessage = new DisconnectedClientMessage(clientUID);
             sendBroadcastAndWaitConfirms(disconnectedClientMessage);
             logger.info("disconnected client " + clientUID);

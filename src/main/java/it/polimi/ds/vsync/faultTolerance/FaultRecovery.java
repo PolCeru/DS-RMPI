@@ -53,6 +53,7 @@ public class FaultRecovery {
      * @param checkpointsToAdd the recovery packet containing the checkpoint and the log
      */
     public void addMissingCheckpoints(ArrayList<Checkpoint> checkpointsToAdd){
+        if(checkpointsToAdd.isEmpty()) return;
         checkpoints.addAll(checkpointsToAdd);
         checkpoints.sort(Comparator.comparingInt(Checkpoint::getCheckpointID));
         checkpointCounter = Math.max(checkpoints.get(checkpoints.size() - 1).getCheckpointID(), checkpointCounter) + 1;
