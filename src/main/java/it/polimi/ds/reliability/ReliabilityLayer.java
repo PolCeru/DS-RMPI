@@ -38,7 +38,7 @@ public class ReliabilityLayer {
     /**
      * Map of messages to be acknowledged, for each message a map of clients and their ack status
      */
-    private final AcknowledgeMap ackMap = new AcknowledgeMap();
+    private AcknowledgeMap ackMap = new AcknowledgeMap();
 
     private final Map<UUID, ReliabilityMessage> unstableReceivedMessages = new HashMap<>();
 
@@ -303,6 +303,22 @@ public class ReliabilityLayer {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void handleDisconnection(UUID clientUID) {
+        //TODO: cercare in lista unstable receive message e timer e rimuovere tutto ciò che è legato a questo
+        // clientUID + svuotare anche reliabilitylayer ackMap con .removeAll()
+        unstableReceivedMessages.forEach((uuid, message) -> {
+            if(uuid.equals(clientUID))
+                unstableReceivedMessages.remove(uuid);
+        });
+        unstableSentMessagesTimer.forEach((uuid, messageTimer) -> {
+            if(uuid.equals(clientUID)) {
+                messageTimer.timer.cancel();
+                unstableSentMessagesTimer.remove(uuid);
+            }
+        });
+        ackMap = new AcknowledgeMap();
     }
 
     private record MessageTimer(Timer timer, ReliabilityMessage message) {
