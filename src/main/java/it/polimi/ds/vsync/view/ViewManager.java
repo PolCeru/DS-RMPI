@@ -63,7 +63,7 @@ public class ViewManager {
 
     private static final Logger logger = LogManager.getLogger();
 
-    private final String FILE_PATH = "recovery/recovery.txt";
+    private final String FILE_PATH;
 
     private final String P_CLIENT_ID = "ClientID";
 
@@ -78,6 +78,29 @@ public class ViewManager {
         this.communicationLayer = communicationLayer;
         this.reliabilityLayer = reliabilityLayer;
 
+        FILE_PATH = /*System.getProperty("user.home") + File.separator + */"recovery" + File.separator +
+                FaultRecovery.counter + File.separator +
+                "recovery.txt";
+
+        File file = new File(FILE_PATH);
+        File directory = file.getParentFile();
+
+        // Verifies whether directory exists, if not creates it
+        if (!directory.exists()) {
+            if (directory.mkdirs())
+                logger.debug("Directory for file recovery created");
+            else logger.error("Error creating directory");
+        }
+
+        if (!file.exists()) {
+            try {
+                if (file.createNewFile()) logger.debug("File for recovery created");
+                else logger.debug("Impossible to create file");
+            } catch (IOException e) {
+                logger.fatal("Error creating file: " + e.getMessage());
+            }
+        }
+
         try (BufferedReader reader = new BufferedReader(new FileReader(FILE_PATH))) {
             properties.load(reader);
             isRecoverable = properties.containsKey(P_CLIENT_ID) &&
@@ -88,7 +111,7 @@ public class ViewManager {
             logger.debug("No recovery found in directory: " + FILE_PATH);
             logger.debug("Starting as new client");
         } catch (IOException e) {
-            logger.debug("There's an error with the BufferedReader " + e.getMessage());
+            logger.fatal("There's an error with the BufferedReader " + e.getMessage());
         }
 
         if (isRecoverable) {
@@ -107,7 +130,7 @@ public class ViewManager {
                         ViewManagerMessage message = getMessage();
                         handleViewMessage(message);
                     } catch (InterruptedException e) {
-                        e.printStackTrace();
+                        logger.debug("ViewManager getMessage interrupted");
                     }
                 }
             }
@@ -116,7 +139,7 @@ public class ViewManager {
 
     public void handleViewMessage(ViewManagerMessage baseMessage) {
         if (baseMessage.messageType != ViewChangeType.CONFIRM)
-            logger.debug("Received stable message " + baseMessage.messageType);
+            logger.debug("Received stable message " + baseMessage.messageType + " with id: " + baseMessage.uuid);
         switch (baseMessage.messageType) {
             case CONFIRM -> {
                 ConfirmViewChangeMessage message = (ConfirmViewChangeMessage) baseMessage;
@@ -137,8 +160,7 @@ public class ViewManager {
                                 confirmBuffer.add(message);
                         case DISCONNECTED_CLIENT -> //received by manager when a group member knows that someone disconnected
                                 confirmBuffer.add(message);
-                        case RECOVERY_PACKET ->
-                                endViewFreeze();
+                        case RECOVERY_PACKET -> endViewFreeze();
                         case INIT_VIEW -> {
                             waitingHosts.remove(message.senderUid);
                             assert waitingHosts.isEmpty();
@@ -154,9 +176,7 @@ public class ViewManager {
                                     new ConfirmViewChangeMessage(clientUID, ViewChangeType.NEW_HOST));
                             viewChangeList = null;
                         }
-                        case RESTART_VIEW -> {
-                            confirmBuffer.add(message);
-                        }
+                        case RESTART_VIEW -> confirmBuffer.add(message);
                     }
                 }
             }
@@ -264,7 +284,7 @@ public class ViewManager {
                 //received by group member from manager when a client wants to retrieve missing checkpoints
                 RecoveryRequestMessage message = (RecoveryRequestMessage) baseMessage;
                 ArrayList<Checkpoint> checkpoints;
-                if(message.lastCheckpointID >= 0) {
+                if (message.lastCheckpointID >= 0) {
                     int checkpointID = message.lastCheckpointID;
                     checkpoints = faultRecovery.recoverCheckpoint(checkpointID);
                 } else checkpoints = new ArrayList<>();
@@ -399,11 +419,13 @@ public class ViewManager {
     }
 
     public void freezeAndCheckpoint() {
-        startFreezeView();
-        handleCheckpoint();
-        RestartViewMessage restartViewMessage = new RestartViewMessage();
-        sendBroadcastAndWaitConfirms(restartViewMessage);
-        endViewFreeze();
+        if(realViewManager.isEmpty()){
+            startFreezeView();
+            handleCheckpoint();
+            RestartViewMessage restartViewMessage = new RestartViewMessage();
+            sendBroadcastAndWaitConfirms(restartViewMessage);
+            endViewFreeze();
+        }
     }
 
     /**
@@ -462,12 +484,14 @@ public class ViewManager {
     }
 
     private void startFreezeView() {
-        reliabilityLayer.stopMessageSending();
-        FreezeViewMessage freezeMessage = new FreezeViewMessage();
-        sendBroadcastAndWaitConfirms(freezeMessage);
-        reliabilityLayer.waitStabilization();
-        assert confirmBuffer.isEmpty();
-        logger.debug("Freeze view complete");
+        if(realViewManager.isEmpty()){
+            reliabilityLayer.stopMessageSending();
+            FreezeViewMessage freezeMessage = new FreezeViewMessage();
+            sendBroadcastAndWaitConfirms(freezeMessage);
+            reliabilityLayer.waitStabilization();
+            assert confirmBuffer.isEmpty();
+            logger.debug("Freeze view complete");
+        }
     }
 
     private void sendBroadcastAndWaitConfirms(ViewManagerMessage message) {
@@ -495,10 +519,9 @@ public class ViewManager {
             properties.setProperty(P_PROCESS_ID, String.valueOf(processID));
             properties.setProperty(P_RANDOM, String.valueOf(random));
             properties.store(writer, "Info to recover the client in case of disconnection");
-            logger.info("Saved recovery data (ClientUID: " + clientUID + "; ProcessID: " + processID + "; Random: " + random + "to the disk");
+            logger.info("Saved recovery data (ClientUID: " + clientUID + "; ProcessID: " + processID + "; Random: " + random + " into the disk");
         } catch (IOException e) {
-            logger.error("Error writing recovery data to file\n" + e.getMessage());
-            logger.error(e.getStackTrace());
+            logger.fatal("Error writing recovery data to file: " + e.getMessage());
         }
     }
 

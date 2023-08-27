@@ -8,6 +8,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.*;
@@ -17,7 +18,9 @@ import java.util.concurrent.locks.ReentrantLock;
 public class FaultRecovery {
 
     private final static Logger logger = LogManager.getLogger();
-    private final VSyncLayer vSyncLayer;
+
+    //FIXME: init to null only for testing purposes, remove it when done + add final
+    private VSyncLayer vSyncLayer = null;
 
     private final SortedSet<VSyncWrapper> log = new TreeSet<>();
 
@@ -31,11 +34,14 @@ public class FaultRecovery {
     
     private final Condition thresholdCondition;
     
-    private final int LOG_THRESHOLD = 1024;
+    private final int LOG_THRESHOLD = 5;
 
-    private final String CHECKPOINTS_FILE_PATH = "checkpoints/Checkpoint" + checkpointCounter + ".bin";
+    //FIXME: added counter only for testing purposes, remove it when done
+    public static int counter = Math.abs(new Random().nextInt());
 
-    public final String RECOVERY_FILE_PATH = "checkpoints/_recoveryCounter.txt";
+    private String CHECKPOINTS_FILE_PATH;
+
+    public final String RECOVERY_FILE_PATH;
 
     private final Properties properties = new Properties();
 
@@ -43,6 +49,23 @@ public class FaultRecovery {
         this.vSyncLayer = vSyncLayer;
         this.lock = new ReentrantLock();
         this.thresholdCondition = lock.newCondition();
+
+        logger.debug("Counter for recovery file: " + counter);
+
+        RECOVERY_FILE_PATH = /*System.getProperty("user.home") + File.separator + */"recovery" + File.separator +
+                counter +  File.separator +
+                "checkpoints" + File.separator + "_recoveryCounter.txt";
+
+
+        File recoveryFile = new File(RECOVERY_FILE_PATH);
+        File recoveryDirectory = recoveryFile.getParentFile();
+
+        // Verifies whether directory exists, if not creates it
+        if (!recoveryDirectory.exists()) {
+            if (recoveryDirectory.mkdirs())
+                logger.debug("Directory for file recovery created");
+            else logger.error("Error creating directory");
+        }
         new Thread(this::checkCondition, "logConditionChecker").start();
     }
 
@@ -68,12 +91,14 @@ public class FaultRecovery {
     public void doCheckpoint(){
         List<byte[]> byteList = log.stream().map(vSyncWrapper -> gson.toJson(vSyncWrapper.message).getBytes()).toList();
         Checkpoint checkpoint = new Checkpoint(checkpointCounter, byteList);
-        writeCheckpointOnFile(byteList);
-        checkpoints.add(checkpoint);
-        log.clear();
-        logger.info("Checkpoint " + (checkpointCounter) + " created successfully");
-        logger.trace("Log cleared after checkpoint " + (checkpointCounter));
-        checkpointCounter++;
+        if (!byteList.isEmpty()){
+            writeCheckpointOnFile(byteList);
+            checkpoints.add(checkpoint);
+            logger.info("Checkpoint " + (checkpointCounter) + " created successfully");
+            log.clear();
+            logger.trace("Log cleared after checkpoint " + (checkpointCounter));
+            checkpointCounter++;
+        } else logger.debug("There was no need to create a checkpoint, the log is empty");
     }
 
     /**
@@ -100,13 +125,36 @@ public class FaultRecovery {
      * @param whatToWrite the checkpoints to be written in form of list of byte array
      */
     private void writeCheckpointOnFile(List<byte[]> whatToWrite) {
+        CHECKPOINTS_FILE_PATH = /*System.getProperty("user.home") + File.separator + */"recovery" + File.separator +
+                counter +  File.separator +
+                "checkpoints" + File.separator +
+                "Checkpoint" + checkpointCounter + ".bin";
+        File file = new File(CHECKPOINTS_FILE_PATH);
+        File recoveryFile = new File(RECOVERY_FILE_PATH);
+
+        if (!recoveryFile.exists()) {
+            try {
+                if (recoveryFile.createNewFile()) logger.debug("File for recovery created");
+                else logger.debug("Impossible to create file");
+            } catch (IOException e) {
+                logger.fatal("Error creating file: " + e.getMessage());
+            }
+        }
+
+        if (!file.exists()) {
+            try {
+                if (file.createNewFile()) logger.debug("File for checkpoints created");
+                else logger.debug("Impossible to create file");
+            } catch (IOException e) {
+                logger.fatal("Error creating file: " + e.getMessage());
+            }
+        }
         logger.debug("Writing checkpoint " + checkpointCounter + " to file");
         try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(CHECKPOINTS_FILE_PATH))) {
-            for (byte[] row: whatToWrite)
+            for (byte[] row : whatToWrite)
                 bos.write(row);
         } catch (IOException e) {
-            logger.error("Error writing checkpoint to file\n" + e.getMessage());
-            logger.error(e.getStackTrace());
+            logger.fatal("Error writing checkpoint to file: " + e.getMessage());
         }
 
         logger.debug("Updating Checkpoint counter in the file");
@@ -114,8 +162,7 @@ public class FaultRecovery {
         try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(RECOVERY_FILE_PATH))) {
             properties.store(bos, "Checkpoint counter to be used in case of recovery");
         } catch (IOException e) {
-            logger.error("Error writing checkpoint to file\n" + e.getMessage());
-            logger.error(e.getStackTrace());
+            logger.fatal("Error writing checkpoint to file: " + e.getMessage());
         }
     }
 
