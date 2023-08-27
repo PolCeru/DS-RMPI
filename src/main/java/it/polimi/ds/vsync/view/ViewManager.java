@@ -48,6 +48,7 @@ public class ViewManager {
 
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     private Optional<UUID> realViewManager = Optional.empty();
+    private Optional<UUID> substituteRealManager = Optional.empty();
 
     private final List<UUID> connectedHosts = new LinkedList<>();
 
@@ -123,6 +124,7 @@ public class ViewManager {
                 logger.debug("Received confirm " + message.confirmedAction + " from " + message.senderUid);
                 if (connectedHosts.isEmpty()) {
                     waitingHosts.remove(message.senderUid);
+                    substituteRealManager = Optional.of(message.senderUid);
                     assert waitingHosts.isEmpty();
                     connectedHosts.add(message.senderUid);
                     isConnected = true;
@@ -174,8 +176,9 @@ public class ViewManager {
                         else processID = message.destinationProcessID;
                         saveDataOnDisk(clientUID, processID, random);
                     } else {
-                        //TODO implement method that create a waitingList with provided list,
-                        // confirm that's ready to viewManager and wait for all connections
+                        if (message.substituteViewManagerId != clientUID) {
+                            substituteRealManager = Optional.of(message.substituteViewManagerId);
+                        }
                         if (viewChangeList == null) viewChangeList = ViewChangeList.fromExpectedUsers(message.topology);
                         else viewChangeList.setExpectedUsers(message.topology);
                         //add the view manager to the connected list
@@ -257,7 +260,12 @@ public class ViewManager {
             }
             case DISCONNECTED_CLIENT -> {
                 //received by group member from manager when a client disconnects
-                handleDisconnection(((DisconnectedClientMessage) baseMessage).disconnectedClientUID);
+                DisconnectedClientMessage disconnectedClientMessage = (DisconnectedClientMessage) baseMessage;
+                if (disconnectedClientMessage.newViewManagerUID != null) {
+                    realViewManager = Optional.of(disconnectedClientMessage.newViewManagerUID);
+                    substituteRealManager = Optional.of(disconnectedClientMessage.newSubstituteViewManagerID);
+                }
+                handleDisconnection(disconnectedClientMessage.disconnectedClientUID);
                 reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID, ViewChangeType.DISCONNECTED_CLIENT));
             }
             case RECOVERY_REQUEST -> {
@@ -324,12 +332,11 @@ public class ViewManager {
                 }
                 communicationLayer.stopDiscoverySender();
                 startConnection(newHostId, newHostAddress);
-                reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology()));
+                reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology(), newHostId));
             } else {
                 logger.info("New host:" + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
             }
         } else if (realViewManager.isEmpty()) { //what to do when you are the real manager
-            //TODO: handle creation logic and propagation of the view
             waitingHosts.add(newHostId);
             startFreezeView();
             handleCheckpoint();
@@ -340,9 +347,9 @@ public class ViewManager {
             if (disconnectedHosts.contains(clientUID) && isRecoverable) {
                 disconnectedHosts.remove(clientUID);
                 connectedHosts.add(clientUID);
-                initialTopologyMessage = new InitialTopologyMessage(clientUID, -1, getCompleteTopology());
+                initialTopologyMessage = new InitialTopologyMessage(clientUID, -1, getCompleteTopology(), substituteRealManager.orElse(null));
             } else
-                initialTopologyMessage = new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology());
+                initialTopologyMessage = new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology(), substituteRealManager.orElse(null));
             reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), initialTopologyMessage);
             acknowledgeMap.sendMessage(initialTopologyMessage.uuid, Collections.singletonList(newHostId));
             //sent new host message to all other hosts
@@ -412,14 +419,20 @@ public class ViewManager {
      * @param clientUID the UUID of the disconnected client
      */
     public synchronized void handleDisconnection(UUID clientUID) {
+        boolean changeManager = false;
         if (connectedHosts.contains(clientUID)) {
             reliabilityLayer.stopMessageSending();
             connectedHosts.remove(clientUID);
             disconnectedHosts.add(clientUID);
             reliabilityLayer.handleDisconnection(clientUID);
         }
+        if (clientUID.equals(realViewManager.orElse(null)) && substituteRealManager.isEmpty()) {
+            realViewManager = Optional.empty();
+            substituteRealManager = connectedHosts.stream().findFirst();
+            changeManager = true;
+        }
         if (realViewManager.isEmpty()) {
-            DisconnectedClientMessage disconnectedClientMessage = new DisconnectedClientMessage(clientUID);
+            DisconnectedClientMessage disconnectedClientMessage = changeManager ? new DisconnectedClientMessage(clientUID, this.clientUID, substituteRealManager.orElse(null)) : new DisconnectedClientMessage(clientUID);
             sendBroadcastAndWaitConfirms(disconnectedClientMessage);
             logger.info("disconnected client " + clientUID);
             handleCheckpoint();
