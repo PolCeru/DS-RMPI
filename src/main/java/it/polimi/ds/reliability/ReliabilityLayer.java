@@ -125,10 +125,10 @@ public class ReliabilityLayer {
         }
     }
 
-    private void checkStable(UUID referencedMessageId) {
-        if (ackMap.isComplete(referencedMessageId)) {
+    private void checkStable(UUID referencedMessageID) {
+        if (ackMap.isComplete(referencedMessageID)) {
             boolean toLog = false;
-            ReliabilityMessage message = unstableReceivedMessages.remove(referencedMessageId);
+            ReliabilityMessage message = unstableReceivedMessages.remove(referencedMessageID);
             if (message != null) {
                 if (message.payload.knowledgeableMessageType == KnowledgeableMessageType.VIEW)
                     viewManager.getBuffer().markStable(message);
@@ -136,11 +136,11 @@ public class ReliabilityLayer {
                     upBuffer.markStable(message);
                     toLog = true;
                 }
-                ackMap.remove(referencedMessageId);
+                ackMap.remove(referencedMessageID);
             } else {
-                MessageTimer messageTimer = unstableSentMessagesTimer.remove(referencedMessageId);
+                MessageTimer messageTimer = unstableSentMessagesTimer.remove(referencedMessageID);
                 if (messageTimer != null) {
-                    ackMap.remove(referencedMessageId);
+                    ackMap.remove(referencedMessageID);
                     messageTimer.timer.cancel();
                     message = messageTimer.message;
                     if (messageTimer.message.payload.knowledgeableMessageType == KnowledgeableMessageType.VSYNC) {
@@ -150,7 +150,7 @@ public class ReliabilityLayer {
             }
             if (toLog) {
                 faultRecovery.logMessage((VSyncMessage) message.getPayload(), message.timestamp);
-                logger.info("Log message: " + message.messageID + " " + message.timestamp);
+                logger.info("Logged message: " + message.messageID + " " + message.timestamp);
             }
         }
     }
@@ -192,7 +192,8 @@ public class ReliabilityLayer {
                 if (message.timestamp.processID() == 0) {
                     message = new ReliabilityMessage(message.messageID, message.payload, new ScalarClock(viewManager.getProcessID(), ++eventID));
                 }
-                logger.debug("Sending VSync message with ID " + message.messageID + " " + message.timestamp + " to all clients");
+                logger.debug("Sending " + message.messageType + " message with ID " + message.messageID + " " + message.timestamp + " to" +
+                        " all clients");
                 handler.sendMessageBroadcast(message);
                 ackMap.sendMessage(message.messageID, viewManager.getConnectedClients());
                 checkDelivery(message);
@@ -236,10 +237,15 @@ public class ReliabilityLayer {
                         if (!retries.containsKey(messageToCheck)) {
                             retries.put(messageToCheck, 1);
                             handler.sendMessage(id, messageToCheck);
-                        } else if (retries.get(messageToCheck) <= MAX_RETRIES) {
+                        } else if (retries.get(messageToCheck) < MAX_RETRIES) {
+                            logger.debug("Timer expired, trying to send the message again");
                             retries.put(messageToCheck, retries.get(messageToCheck) + 1);
                             handler.sendMessage(id, messageToCheck);
-                        } else handler.disconnectClient(id);
+                        } else {
+                            logger.debug("Timer expired again, disconnecting client");
+                            handler.disconnectClient(id);
+                            timer.cancel();
+                        }
                     });
                 }
             }
