@@ -2,11 +2,11 @@
 <Configuration xmlns="http://logging.apache.org/log4j/2.0/config">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
-            <PatternLayout pattern="%-5level [%t@%logger{1}] - %msg%n"/>
+            <PatternLayout pattern="%highlight{%-5level [%t@%logger{1}] - %msg%n}"/>
         </Console>
     </Appenders>
     <Loggers>
-        <Root level="info">
+        <Root level="debug">
             <AppenderRef ref="Console"/>
         </Root>
     </Loggers>
