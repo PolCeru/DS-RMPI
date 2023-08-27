@@ -323,6 +323,7 @@ public class CommunicationLayer {
     }
 
     public void disconnectClient(UUID clientUID) {
+        connectedClients.get(clientUID).close();
         connectedClients.remove(clientUID);
         viewManager.handleDisconnection(clientUID);
     }
