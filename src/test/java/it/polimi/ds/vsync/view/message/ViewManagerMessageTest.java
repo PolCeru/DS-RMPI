@@ -31,7 +31,7 @@ public class ViewManagerMessageTest {
         @DisplayName("Serialization of initial topology message with empty view")
         void EmptyTopologySerialization() {
             Gson gson = new MessageGsonBuilder().registerViewMessageAdapter().registerKnowledgeableMessage().create();
-            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), 0, new ArrayList<>());
+            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), 0, new ArrayList<>(), null);
             String json = gson.toJson(message);
             System.out.println(json);
         }
@@ -43,7 +43,7 @@ public class ViewManagerMessageTest {
             ArrayList<UUID> topology = new ArrayList<>();
             topology.add(UUID.randomUUID());
             topology.add(UUID.randomUUID());
-            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), 0, topology);
+            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), 0, topology, null);
             String json = gson.toJson(message);
             System.out.println(json);
         }
@@ -52,7 +52,7 @@ public class ViewManagerMessageTest {
         @DisplayName("Deserialization of initial topology message with empty view")
         void EmptyTopologyDeSerialization() {
             Gson gson = new MessageGsonBuilder().registerViewMessageAdapter().registerKnowledgeableMessage().create();
-            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), 0, new ArrayList<>());
+            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), 0, new ArrayList<>(), null);
             String json = gson.toJson(message);
             InitialTopologyMessage deserializedMessage = (InitialTopologyMessage) gson.fromJson(json, ViewManagerMessage.class);
             assertEquals(message, deserializedMessage);
@@ -65,7 +65,7 @@ public class ViewManagerMessageTest {
             ArrayList<UUID> topology = new ArrayList<>();
             topology.add(UUID.randomUUID());
             topology.add(UUID.randomUUID());
-            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), 0, topology);
+            InitialTopologyMessage message = new InitialTopologyMessage(UUID.randomUUID(), 0, topology, null);
             String json = gson.toJson(message);
             InitialTopologyMessage deserializedMessage = (InitialTopologyMessage) gson.fromJson(json, ViewManagerMessage.class);
             assertEquals(message, deserializedMessage);
@@ -79,7 +79,7 @@ public class ViewManagerMessageTest {
         void testEncodingInitialTopology() {
             CommunicationLayer communicationLayer =
                     CommunicationLayer.defaultConfiguration(new ViewManagerBuilder(null, new FaultRecovery(null)));
-            InitialTopologyMessage initialTopologyMessage = new InitialTopologyMessage(null, 0, null);
+            InitialTopologyMessage initialTopologyMessage = new InitialTopologyMessage(null, 0, null, null);
             ReliabilityMessage reliabilityMessage = new ReliabilityMessage(null, initialTopologyMessage, new ScalarClock(0, 0));
             DataMessage dataMessage = new DataMessage(LocalDateTime.now(), null, reliabilityMessage);
             try {
