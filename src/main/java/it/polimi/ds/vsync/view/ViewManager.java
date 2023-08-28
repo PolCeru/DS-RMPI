@@ -144,7 +144,7 @@ public class ViewManager {
         switch (baseMessage.messageType) {
             case CONFIRM -> {
                 ConfirmViewChangeMessage message = (ConfirmViewChangeMessage) baseMessage;
-                logger.debug("Received confirm " + message.confirmedAction + " from " + message.senderUid);
+                logger.debug("Received CONFIRM " + message.confirmedAction + " from " + message.senderUid);
                 if (!isConnected) {
                     waitingHosts.remove(message.senderUid);
                     substituteRealManager = Optional.of(message.senderUid);
@@ -192,7 +192,10 @@ public class ViewManager {
                         reliabilityLayer.startMessageSending();
                         if (message.destinationProcessID == -1 && isRecoverable)
                             processID = Integer.parseInt(properties.getProperty(P_PROCESS_ID));
-                        else processID = message.destinationProcessID;
+                        else {
+                            processID = message.destinationProcessID;
+                            faultRecovery.setCheckpointCounter(message.checkpointCounter);
+                        }
                         saveDataOnDisk(clientUID, processID, random);
                     } else {
                         if (message.substituteViewManagerId != clientUID) {
@@ -204,7 +207,10 @@ public class ViewManager {
                         handleNewConnection(message.viewManagerId);
                         if (message.destinationProcessID == -1 && isRecoverable)
                             processID = Integer.parseInt(properties.getProperty(P_PROCESS_ID));
-                        else processID = message.destinationProcessID;
+                        else{
+                            processID = message.destinationProcessID;
+                            faultRecovery.setCheckpointCounter(message.checkpointCounter);
+                        }
                         saveDataOnDisk(clientUID, processID, random);
                         viewChangeList.addConnectedUser(message.viewManagerId);
                         //add all the others clients
@@ -227,7 +233,7 @@ public class ViewManager {
                 }
                 reliabilityLayer.sendViewMessage(List.of(realViewManager.get()),
                         new ConfirmViewChangeMessage(clientUID, ViewChangeType.INIT_VIEW));
-                //Request missing checkpoints
+                //Requests missing checkpoints
                 try (BufferedReader reader = new BufferedReader(new FileReader(faultRecovery.RECOVERY_FILE_PATH))) {
                     faultRecovery.getProperties().load(reader);
                     int checkpointCounter = Integer.parseInt(faultRecovery.getProperties().getProperty("CheckpointCounter"));
@@ -355,7 +361,7 @@ public class ViewManager {
                 startConnection(newHostId, newHostAddress);
                 reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId),
                         new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology(),
-                                newHostId));
+                                newHostId, faultRecovery.getCheckpointCounter()));
             } else {
                 logger.info("New host:" + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
             }
@@ -370,9 +376,11 @@ public class ViewManager {
             if (disconnectedHosts.contains(clientUID) && isRecoverable) {
                 disconnectedHosts.remove(clientUID);
                 connectedHosts.add(clientUID);
-                initialTopologyMessage = new InitialTopologyMessage(clientUID, -1, getCompleteTopology(), substituteRealManager.orElse(null));
+                initialTopologyMessage = new InitialTopologyMessage(clientUID, -1, getCompleteTopology(),
+                        substituteRealManager.orElse(null), 0);
             } else
-                initialTopologyMessage = new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology(), substituteRealManager.orElse(null));
+                initialTopologyMessage = new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter,
+                        getCompleteTopology(), substituteRealManager.orElse(null), faultRecovery.getCheckpointCounter());
             reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), initialTopologyMessage);
             acknowledgeMap.sendMessage(initialTopologyMessage.uuid, Collections.singletonList(newHostId));
             //sent new host message to all other hosts
@@ -491,7 +499,7 @@ public class ViewManager {
 
     private void endViewFreeze() {
         reliabilityLayer.startMessageSending();
-        logger.debug("ending freeze view");
+        logger.debug("Freeze view ended");
         logger.trace("Connected clients: " + connectedHosts);
     }
 

@@ -19,8 +19,7 @@ public class FaultRecovery {
 
     private final static Logger logger = LogManager.getLogger();
 
-    //FIXME: init to null only for testing purposes, remove it when done + add final
-    private VSyncLayer vSyncLayer = null;
+    private final VSyncLayer vSyncLayer;
 
     private final SortedSet<VSyncWrapper> log = new TreeSet<>();
 
@@ -186,6 +185,14 @@ public class FaultRecovery {
         } finally {
             lock.unlock();
         }
+    }
+
+    public void setCheckpointCounter(int checkpointCounter) {
+        this.checkpointCounter = checkpointCounter;
+    }
+
+    public int getCheckpointCounter() {
+        return checkpointCounter;
     }
 
     private record VSyncWrapper(VSyncMessage message, ScalarClock timestamp) implements Comparable<VSyncWrapper> {
