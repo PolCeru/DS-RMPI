@@ -188,6 +188,14 @@ public class FaultRecovery {
         }
     }
 
+    public void setCheckpointCounter(int checkpointCounter) {
+        this.checkpointCounter = checkpointCounter;
+    }
+
+    public int getCheckpointCounter() {
+        return checkpointCounter;
+    }
+
     private record VSyncWrapper(VSyncMessage message, ScalarClock timestamp) implements Comparable<VSyncWrapper> {
         @Override
         public int compareTo(VSyncWrapper o) {

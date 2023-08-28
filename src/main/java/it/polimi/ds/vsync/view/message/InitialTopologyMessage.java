@@ -9,17 +9,16 @@ public class InitialTopologyMessage extends ViewManagerMessage {
     public final UUID viewManagerId;
     public final UUID substituteViewManagerId;
     public final int destinationProcessID;
+    public final int checkpointCounter;
 
-    public InitialTopologyMessage(UUID viewManagerId, int destinationProcessID, List<UUID> topology, UUID substituteViewManagerId) {
+    public InitialTopologyMessage(UUID viewManagerId, int destinationProcessID, List<UUID> topology,
+                                  UUID substituteViewManagerId, int checkpointCounter) {
         super(ViewChangeType.INIT_VIEW);
         this.viewManagerId = viewManagerId;
         this.topology = topology;
         this.destinationProcessID = destinationProcessID;
         this.substituteViewManagerId = substituteViewManagerId;
-    }
-
-    public List<UUID> getTopology() {
-        return topology;
+        this.checkpointCounter = checkpointCounter;
     }
 
     @Override
