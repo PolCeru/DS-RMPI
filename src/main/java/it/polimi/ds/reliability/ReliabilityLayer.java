@@ -224,6 +224,7 @@ public class ReliabilityLayer {
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
+                logger.debug("retries: " + retries.get(messageToCheck));
                 List<UUID> list = ackMap.missingAcks(messageToCheck.messageID);
                 if (list.isEmpty()) {
                     if (messageToCheck.getPayload().knowledgeableMessageType == KnowledgeableMessageType.VSYNC) {

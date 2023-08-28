@@ -338,6 +338,7 @@ public class ViewManager {
         if (connectedHosts.isEmpty()) {
             if (random < newHostRandom) {
                 if (realViewManager.isEmpty()) {
+                    logger.error("I AM THE REAL MANAGER");
                     processID = 1;
                     clientsProcessIDCounter = 1;
                     saveDataOnDisk(clientUID, processID, random);
@@ -475,6 +476,7 @@ public class ViewManager {
 
     private void endViewFreeze() {
         reliabilityLayer.startMessageSending();
+        logger.debug("ending freeze view");
         logger.trace("Connected clients: " + connectedHosts);
     }
 

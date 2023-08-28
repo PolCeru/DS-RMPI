@@ -63,6 +63,7 @@ public class ClientHandler implements Runnable {
                 outputStream.writeInt(payload.length);
                 outputStream.write(payload);
             } catch (IOException e) {
+                System.err.println("couldn't send" + e.getMessage());
                 close();
                 messageHandler.disconnectClient(clientUID);
             }
@@ -84,6 +85,7 @@ public class ClientHandler implements Runnable {
                 DataMessage message = CommunicationLayer.gson.fromJson(new String(payload, StandardCharsets.UTF_8), DataMessage.class);
                 messageHandler.getUpBuffer().add(message);
             } catch (IOException e) {
+                System.err.println("couldn't read " + e.getMessage());
                 close();
                 messageHandler.disconnectClient(clientUID);
                 break;
@@ -97,7 +99,7 @@ public class ClientHandler implements Runnable {
             outputStream.close();
             socket.close();
         } catch (IOException e) {
-            System.err.println("couldn't close" + e.getMessage());
+            System.err.println("couldn't close " + e.getMessage());
         }
     }
 
