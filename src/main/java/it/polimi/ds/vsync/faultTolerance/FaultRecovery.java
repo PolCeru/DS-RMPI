@@ -36,9 +36,6 @@ public class FaultRecovery {
     
     private final int LOG_THRESHOLD = 5;
 
-    //FIXME: added counter only for testing purposes, remove it when done
-    public static int counter = Math.abs(new Random().nextInt());
-
     private String CHECKPOINTS_FILE_PATH;
 
     public final String RECOVERY_FILE_PATH;
@@ -50,10 +47,7 @@ public class FaultRecovery {
         this.lock = new ReentrantLock();
         this.thresholdCondition = lock.newCondition();
 
-        logger.debug("Counter for recovery file: " + counter);
-
-        RECOVERY_FILE_PATH = /*System.getProperty("user.home") + File.separator + */"recovery" + File.separator +
-                counter +  File.separator +
+        RECOVERY_FILE_PATH = System.getProperty("user.home") + File.separator + "recovery" + File.separator +
                 "checkpoints" + File.separator + "_recoveryCounter.txt";
 
 
@@ -125,8 +119,7 @@ public class FaultRecovery {
      * @param whatToWrite the checkpoints to be written in form of list of byte array
      */
     private void writeCheckpointOnFile(List<byte[]> whatToWrite) {
-        CHECKPOINTS_FILE_PATH = /*System.getProperty("user.home") + File.separator + */"recovery" + File.separator +
-                counter +  File.separator +
+        CHECKPOINTS_FILE_PATH = System.getProperty("user.home") + File.separator + "recovery" + File.separator +
                 "checkpoints" + File.separator +
                 "Checkpoint" + checkpointCounter + ".bin";
         File file = new File(CHECKPOINTS_FILE_PATH);

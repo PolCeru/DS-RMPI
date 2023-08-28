@@ -20,6 +20,7 @@ import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+//@SuppressWarnings("OptionalGetWithoutIsPresent")
 public class ViewManager {
 
     /**
@@ -78,8 +79,7 @@ public class ViewManager {
         this.communicationLayer = communicationLayer;
         this.reliabilityLayer = reliabilityLayer;
 
-        FILE_PATH = /*System.getProperty("user.home") + File.separator + */"recovery" + File.separator +
-                FaultRecovery.counter + File.separator +
+        FILE_PATH = System.getProperty("user.home") + File.separator + "recovery" + File.separator +
                 "recovery.txt";
 
         File file = new File(FILE_PATH);
