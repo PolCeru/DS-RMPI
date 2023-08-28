@@ -41,4 +41,12 @@ public class VSyncLayer {
     public ViewManager getViewManager() {
         return viewManager;
     }
+
+    public byte[] receiveMessage() {
+        return ((VSyncMessage) handler.getMessage().payload).payload;
+    }
+
+    public void sendMessage(byte[] payload) {
+        handler.sendMessage(new VSyncMessage(payload));
+    }
 }

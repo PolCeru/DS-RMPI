@@ -73,7 +73,7 @@ public class FaultRecovery {
         checkpoints.addAll(checkpointsToAdd);
         checkpoints.sort(Comparator.comparingInt(Checkpoint::getCheckpointID));
         checkpointCounter = Math.max(checkpoints.get(checkpoints.size() - 1).getCheckpointID(), checkpointCounter) + 1;
-        checkpointsToAdd.forEach(checkpoint -> writeCheckpointOnFile(checkpoint.getMessages()));
+        saveCheckpoints(checkpointsToAdd);
         log.clear();
     }
 
@@ -101,16 +101,14 @@ public class FaultRecovery {
      * @return the recovery packet containing the requested checkpoints and the log
      */
     public ArrayList<Checkpoint> recoverCheckpoint(int checkpointID){
+        ArrayList<Checkpoint> checkpointsToReturn = new ArrayList<>();
         for (Checkpoint checkpoint : checkpoints) {
-            if(checkpoint.getCheckpointID() == checkpointID){
-                ArrayList<Checkpoint> checkpointsToReturn = new ArrayList<>();
-                for (int i = checkpointCounter; i < checkpoints.size(); i++) {
-                    checkpointsToReturn.add(checkpoints.get(i));
-                }
-                return new ArrayList<>(checkpointsToReturn);
-            } else throw new IllegalArgumentException("Checkpoint not found");
+            if(checkpoint.getCheckpointID() >= checkpointID){
+                checkpointsToReturn.add(checkpoint);
+            }
         }
-        return null;
+        if(checkpointsToReturn.isEmpty()) throw new IllegalArgumentException("Checkpoint not found");
+        else return checkpointsToReturn;
     }
 
     /**
@@ -155,6 +153,51 @@ public class FaultRecovery {
             properties.store(bos, "Checkpoint counter to be used in case of recovery");
         } catch (IOException e) {
             logger.fatal("Error writing checkpoint to file: " + e.getMessage());
+        }
+    }
+
+    private void saveCheckpoints(List<Checkpoint> whatToWrite) {
+        File recoveryFile = new File(RECOVERY_FILE_PATH);
+
+        if (!recoveryFile.exists()) {
+            try {
+                if (recoveryFile.createNewFile()) logger.debug("File for recovery created");
+                else logger.debug("Impossible to create file");
+            } catch (IOException e) {
+                logger.fatal("Error creating file: " + e.getMessage());
+            }
+        }
+
+        logger.debug("Updating Checkpoint counter in the file");
+        properties.setProperty("CheckpointCounter", String.valueOf(checkpointCounter));
+        try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(RECOVERY_FILE_PATH))) {
+            properties.store(bos, "Checkpoint counter to be used in case of recovery");
+        } catch (IOException e) {
+            logger.fatal("Error writing checkpoint to file: " + e.getMessage());
+        }
+
+        for (Checkpoint checkpoint : whatToWrite) {
+            CHECKPOINTS_FILE_PATH = System.getProperty("user.home") + File.separator + "recovery" + File.separator +
+                    "checkpoints" + File.separator +
+                    "Checkpoint" + checkpoint.getCheckpointID() + ".bin";
+            File file = new File(CHECKPOINTS_FILE_PATH);
+
+            if (!file.exists()) {
+                try {
+                    if (file.createNewFile()) logger.debug("File for checkpoints created");
+                    else logger.debug("Impossible to create file");
+                } catch (IOException e) {
+                    logger.fatal("Error creating file: " + e.getMessage());
+                }
+            }
+            logger.debug("Writing checkpoint " + checkpoint.getCheckpointID() + " to file");
+            try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(CHECKPOINTS_FILE_PATH))) {
+                for (byte[] row : whatToWrite.stream().map(ch -> gson.toJson(ch).getBytes()).toList())
+                    bos.write(row);
+            } catch (IOException e) {
+                logger.fatal("Error writing checkpoint to file: " + e.getMessage());
+            }
+
         }
     }
 

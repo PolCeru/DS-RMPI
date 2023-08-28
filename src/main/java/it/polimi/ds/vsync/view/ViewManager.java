@@ -238,7 +238,9 @@ public class ViewManager {
                     faultRecovery.getProperties().load(reader);
                     int checkpointCounter = Integer.parseInt(
                             faultRecovery.getProperties().getProperty("CheckpointCounter"));
-                    checkpointCounter = checkpointCounter > 0 ? checkpointCounter : -1;
+                    logger.warn("Checkpoint counter after parsing: " + checkpointCounter);
+                    checkpointCounter = checkpointCounter >= 0 ? checkpointCounter : -1;
+                    logger.warn("Checkpoint counter after condition evaluation: " + checkpointCounter);
                     if (isRecoverable)
                         reliabilityLayer.sendViewMessage(List.of(realViewManager.get()),
                                 new RecoveryRequestMessage(checkpointCounter, clientUID));
@@ -302,16 +304,19 @@ public class ViewManager {
                 //received by view manager from reconnecting group member when it wants to retrieve missing checkpoints
                 RecoveryRequestMessage message = (RecoveryRequestMessage) baseMessage;
                 ArrayList<Checkpoint> checkpoints;
+                logger.warn("Received recovery request with id: "+message.lastCheckpointID);
                 if (message.lastCheckpointID >= 0) {
                     int checkpointID = message.lastCheckpointID;
                     checkpoints = faultRecovery.recoverCheckpoint(checkpointID);
                 } else checkpoints = new ArrayList<>();
+                logger.warn("Checkpoints: "+checkpoints);
                 reliabilityLayer.sendViewMessage(Collections.singletonList(message.senderUUID),
                         new RecoveryPacketMessage(checkpoints));
             }
             case RECOVERY_PACKET -> {
                 //received by group member from manager, it contains the missing checkpoints requested
                 RecoveryPacketMessage message = (RecoveryPacketMessage) baseMessage;
+                logger.warn("Received recovery packet with checkpoints: "+message.checkpoints);
                 faultRecovery.addMissingCheckpoints(message.checkpoints);
                 reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()),
                         new ConfirmViewChangeMessage(clientUID, ViewChangeType.RECOVERY_PACKET));
@@ -373,8 +378,10 @@ public class ViewManager {
         } else if (realViewManager.isEmpty()) {//what to do when you are the real manager
             waitingHosts.add(newHostId);
             boolean clientCanBeRecovered = disconnectedHosts.contains(newHostId);
-            startFreezeView();
-            handleCheckpoint();
+            if (connectedHosts.size() > 0) {
+                startFreezeView();
+                handleCheckpoint();
+            }
             communicationLayer.initConnection(newHostAddress, newHostId);
             AcknowledgeMap acknowledgeMap = new AcknowledgeMap();
             InitialTopologyMessage initialTopologyMessage;
@@ -382,26 +389,30 @@ public class ViewManager {
             if (clientCanBeRecovered) {
                 disconnectedHosts.remove(newHostId);
                 initialTopologyMessage = new InitialTopologyMessage(clientUID, -1, getCompleteTopology(),
-                        substituteRealManager.orElse(null), 0);
+                        substituteRealManager.orElse(null), -1);
             } else
                 initialTopologyMessage = new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter,
                         getCompleteTopology(), substituteRealManager.orElse(null),
-                        faultRecovery.getCheckpointCounter());
+                        faultRecovery.getCheckpointCounter()-1);
             reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), initialTopologyMessage);
             acknowledgeMap.sendMessage(initialTopologyMessage.uuid, Collections.singletonList(newHostId));
             //sent new host message to all other hosts
-            NewHostMessage newHostMessage = new NewHostMessage(newHostAddress, newHostId, newHostRandom);
-            reliabilityLayer.sendViewMessage(connectedHosts, newHostMessage);
-            acknowledgeMap.sendMessage(newHostMessage.uuid, connectedHosts);
+            NewHostMessage newHostMessage = null;
+            if (connectedHosts.size() > 0) {
+                newHostMessage = new NewHostMessage(newHostAddress, newHostId, newHostRandom);
+                reliabilityLayer.sendViewMessage(connectedHosts, newHostMessage);
+                acknowledgeMap.sendMessage(newHostMessage.uuid, connectedHosts);
+            }
             //wait for all confirms
-            while (!acknowledgeMap.isComplete(newHostMessage.uuid) || !acknowledgeMap.isComplete(
+            while ((newHostMessage != null && !acknowledgeMap.isComplete(
+                    newHostMessage.uuid)) || !acknowledgeMap.isComplete(
                     initialTopologyMessage.uuid)) {
                 try {
                     ConfirmViewChangeMessage confirmMessage = confirmBuffer.take();
                     if (confirmMessage.confirmedAction == initialTopologyMessage.messageType) {
                         acknowledgeMap.receiveAck(initialTopologyMessage.uuid, confirmMessage.senderUid,
                                 connectedHosts);
-                    } else if (confirmMessage.confirmedAction == newHostMessage.messageType) {
+                    } else if (newHostMessage != null && confirmMessage.confirmedAction == newHostMessage.messageType) {
                         acknowledgeMap.receiveAck(newHostMessage.uuid, confirmMessage.senderUid, connectedHosts);
                     } else {
                         logger.warn("Unexpected confirm for action " + confirmMessage.confirmedAction);
@@ -473,13 +484,20 @@ public class ViewManager {
             changeManager = true;
         }
         if (realViewManager.isEmpty()) {
-            //TODO add freeze view logic here
-            DisconnectedClientMessage disconnectedClientMessage = changeManager ?
-                    new DisconnectedClientMessage(clientUID, this.clientUID, substituteRealManager.orElse(null)) :
-                    new DisconnectedClientMessage(clientUID);
-            sendBroadcastAndWaitConfirms(disconnectedClientMessage);
-            logger.info("disconnected client " + clientUID);
+            if (connectedHosts.size() > 0) {
+                startFreezeView();
+                DisconnectedClientMessage disconnectedClientMessage = changeManager ?
+                        new DisconnectedClientMessage(clientUID, this.clientUID, substituteRealManager.orElse(null)) :
+                        new DisconnectedClientMessage(clientUID);
+                sendBroadcastAndWaitConfirms(disconnectedClientMessage);
+            }
             handleCheckpoint();
+            logger.info("disconnected client " + clientUID);
+            if (connectedHosts.size() > 0) {
+                RestartViewMessage restartViewMessage = new RestartViewMessage();
+                sendBroadcastAndWaitConfirms(restartViewMessage);
+                endViewFreeze();
+            }
         }
     }
 
