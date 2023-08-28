@@ -56,6 +56,11 @@ public class AcknowledgeMap {
         }
     }
 
+    public synchronized void clear() {
+        ackMap.clear();
+        notify();
+    }
+
     private static class MessageState {
         private boolean messageReceived;
         private final Map<UUID, Boolean> ackMap;

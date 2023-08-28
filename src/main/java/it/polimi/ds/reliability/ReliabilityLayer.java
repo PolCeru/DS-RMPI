@@ -152,7 +152,8 @@ public class ReliabilityLayer {
                 faultRecovery.logMessage((VSyncMessage) message.getPayload(), message.timestamp);
                 logger.info("Logged message: " + message.messageID + " " + message.timestamp);
             }
-        }
+        } else
+            logger.warn("Message " + referencedMessageID + " is not stable yet, missing "+ ackMap.missingAcks(referencedMessageID));
     }
 
     private void sendAck(ReliabilityMessage messageReceived, ScalarClock timestamp, UUID senderUID) {
@@ -330,7 +331,7 @@ public class ReliabilityLayer {
                 unstableSentMessagesTimer.remove(uuid);
             }
         });
-        ackMap = new AcknowledgeMap();
+        ackMap.clear();
     }
 
     private record MessageTimer(Timer timer, ReliabilityMessage message) {
