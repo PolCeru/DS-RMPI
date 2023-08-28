@@ -195,10 +195,12 @@ public class ReliabilityLayer {
                     }
                 }
                 if (message.timestamp.processID() == 0) {
-                    message = new ReliabilityMessage(message.messageID, message.payload, new ScalarClock(viewManager.getProcessID(), ++eventID));
+                    message = new ReliabilityMessage(message.messageID, message.payload,
+                            new ScalarClock(viewManager.getProcessID(), ++eventID));
                 }
-                logger.debug("Sending " + message.messageType + " message with ID " + message.messageID + " " + message.timestamp + " to" +
-                        " all clients");
+                logger.debug(
+                        "Sending " + message.messageType + " message with ID " + message.messageID + " " + message.timestamp + " to" +
+                                " all clients");
                 handler.sendMessageBroadcast(message);
                 ackMap.sendMessage(message.messageID, viewManager.getConnectedClients());
                 checkDelivery(message);
@@ -229,7 +231,6 @@ public class ReliabilityLayer {
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                logger.debug("retries: " + retries.get(messageToCheck));
                 List<UUID> list = ackMap.missingAcks(messageToCheck.messageID);
                 if (list.isEmpty()) {
                     if (messageToCheck.getPayload().knowledgeableMessageType == KnowledgeableMessageType.VSYNC) {

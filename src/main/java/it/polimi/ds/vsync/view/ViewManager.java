@@ -145,7 +145,7 @@ public class ViewManager {
             case CONFIRM -> {
                 ConfirmViewChangeMessage message = (ConfirmViewChangeMessage) baseMessage;
                 logger.debug("Received confirm " + message.confirmedAction + " from " + message.senderUid);
-                if (connectedHosts.isEmpty()) {
+                if (!isConnected) {
                     waitingHosts.remove(message.senderUid);
                     substituteRealManager = Optional.of(message.senderUid);
                     assert waitingHosts.isEmpty();
@@ -184,12 +184,11 @@ public class ViewManager {
             }
             case INIT_VIEW -> {
                 InitialTopologyMessage message = (InitialTopologyMessage) baseMessage;
-                if (connectedHosts.isEmpty()) {
+                if (!isConnected) {
                     realViewManager = Optional.of(message.viewManagerId);
                     if (message.topology.size() == 1) {
                         //only the viewManager connected
                         handleNewConnection(message.viewManagerId);
-                        isConnected = true;
                         reliabilityLayer.startMessageSending();
                         if (message.destinationProcessID == -1 && isRecoverable)
                             processID = Integer.parseInt(properties.getProperty(P_PROCESS_ID));
@@ -319,10 +318,11 @@ public class ViewManager {
         //already connected, so discard
         if (connectedHosts.contains(newHostId)) return;
         // first connection between device
-        if (connectedHosts.isEmpty()) {
+        if (!isConnected) {
             communicationLayer.stopDiscoverySender();
         }
         connectedHosts.add(newHostId);
+        if (!isConnected) isConnected = true;
     }
 
     private List<UUID> getCompleteTopology() {
@@ -343,7 +343,7 @@ public class ViewManager {
         if (connectedHosts.contains(newHostId) || waitingHosts.contains(newHostId) || newHostId.equals(clientUID))
             return;
         // first connection between devices
-        if (connectedHosts.isEmpty()) {
+        if (!isConnected) {
             if (random < newHostRandom) {
                 if (realViewManager.isEmpty()) {
                     logger.error("I AM THE REAL MANAGER");
@@ -353,7 +353,9 @@ public class ViewManager {
                 }
                 communicationLayer.stopDiscoverySender();
                 startConnection(newHostId, newHostAddress);
-                reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology(), newHostId));
+                reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId),
+                        new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter, getCompleteTopology(),
+                                newHostId));
             } else {
                 logger.info("New host:" + newHostAddress.getHostAddress() + "(random " + newHostRandom + ")");
             }
