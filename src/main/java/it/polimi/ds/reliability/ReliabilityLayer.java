@@ -87,7 +87,7 @@ public class ReliabilityLayer {
             UUID senderUID = dataMessage.senderUID;
             ReliabilityMessage messageReceived = dataMessage.payload;
             if (messageReceived.messageType == MessageType.ACK)
-                logger.trace("Received " + messageReceived.messageType + " message with ID " +
+                logger.debug("Received " + messageReceived.messageType + " message with ID " +
                         messageReceived.messageID + " for message " + messageReceived.referenceMessageID + " from " + senderUID);
             else
                 logger.trace("Received " + messageReceived.messageType + " message with ID " +
@@ -227,7 +227,7 @@ public class ReliabilityLayer {
      * @param messageToCheck the message to be checked
      */
     private void checkDelivery(ReliabilityMessage messageToCheck) {
-        Timer timer = new Timer();
+        Timer timer = new Timer("Timer-"+ messageToCheck.messageID);
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
@@ -245,7 +245,7 @@ public class ReliabilityLayer {
                             retries.put(messageToCheck, 1);
                             handler.sendMessage(id, messageToCheck);
                         } else if (retries.get(messageToCheck) < MAX_RETRIES) {
-                            logger.debug("Timer expired, trying to send the message again");
+                            logger.debug("Timer expired, trying to send the message again to "+list);
                             retries.put(messageToCheck, retries.get(messageToCheck) + 1);
                             handler.sendMessage(id, messageToCheck);
                         } else {
@@ -270,7 +270,7 @@ public class ReliabilityLayer {
         }
         ackMap.sendMessage(messageToSend.messageID, destinations);
         for (UUID destination : destinations) {
-            logger.debug("Sent message " + message.messageType + " " + messageToSend.timestamp + " with ID " + message.uuid +
+            logger.debug("Sent message " + message.messageType + " " + messageToSend.timestamp + " with ID " + messageToSend.messageID +
                     " to " + destination);
             handler.sendMessage(destination, messageToSend);
         }

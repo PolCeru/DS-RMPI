@@ -33,7 +33,7 @@ public class FaultRecovery {
     
     private final Condition thresholdCondition;
     
-    private final int LOG_THRESHOLD = 5;
+    private final int LOG_THRESHOLD = 100;
 
     private String CHECKPOINTS_FILE_PATH;
 
@@ -166,6 +166,7 @@ public class FaultRecovery {
         lock.lock();
         try {
             log.add(new VSyncWrapper(message, timestamp));
+            logger.debug("Log size "+log.size());
             thresholdCondition.signalAll();
         } finally {
             lock.unlock();
@@ -189,6 +190,13 @@ public class FaultRecovery {
 
     public void setCheckpointCounter(int checkpointCounter) {
         this.checkpointCounter = checkpointCounter;
+        logger.debug("Updating Checkpoint counter in the file");
+        properties.setProperty("CheckpointCounter", String.valueOf(checkpointCounter));
+        try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(RECOVERY_FILE_PATH))) {
+            properties.store(bos, "Checkpoint counter to be used in case of recovery");
+        } catch (IOException e) {
+            logger.fatal("Error writing checkpoint to file: " + e.getMessage());
+        }
     }
 
     public int getCheckpointCounter() {

@@ -75,7 +75,8 @@ public class ViewManager {
 
     private final Properties properties = new Properties();
 
-    public ViewManager(VSyncLayer vSyncLayer, ReliabilityLayer reliabilityLayer, CommunicationLayer communicationLayer, FaultRecovery faultRecovery) {
+    public ViewManager(VSyncLayer vSyncLayer, ReliabilityLayer reliabilityLayer, CommunicationLayer communicationLayer,
+                       FaultRecovery faultRecovery) {
         this.faultRecovery = faultRecovery;
         this.communicationLayer = communicationLayer;
         this.reliabilityLayer = reliabilityLayer;
@@ -207,7 +208,7 @@ public class ViewManager {
                         handleNewConnection(message.viewManagerId);
                         if (message.destinationProcessID == -1 && isRecoverable)
                             processID = Integer.parseInt(properties.getProperty(P_PROCESS_ID));
-                        else{
+                        else {
                             processID = message.destinationProcessID;
                             faultRecovery.setCheckpointCounter(message.checkpointCounter);
                         }
@@ -236,9 +237,11 @@ public class ViewManager {
                 //Requests missing checkpoints
                 try (BufferedReader reader = new BufferedReader(new FileReader(faultRecovery.RECOVERY_FILE_PATH))) {
                     faultRecovery.getProperties().load(reader);
-                    int checkpointCounter = Integer.parseInt(faultRecovery.getProperties().getProperty("CheckpointCounter"));
+                    int checkpointCounter = Integer.parseInt(
+                            faultRecovery.getProperties().getProperty("CheckpointCounter"));
                     checkpointCounter = checkpointCounter > 0 ? checkpointCounter : -1;
-                    reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new RecoveryRequestMessage(checkpointCounter));
+                    reliabilityLayer.sendViewMessage(List.of(realViewManager.get()),
+                            new RecoveryRequestMessage(checkpointCounter));
                 } catch (FileNotFoundException e) {
                     logger.debug("No recovery file found in directory");
                 } catch (IOException e) {
@@ -250,7 +253,8 @@ public class ViewManager {
                 reliabilityLayer.stopMessageSending();
                 reliabilityLayer.waitStabilization();
                 logger.debug("Freeze view complete");
-                reliabilityLayer.sendViewMessage(List.of(realViewManager.get()), new ConfirmViewChangeMessage(clientUID, ViewChangeType.FREEZE_VIEW));
+                reliabilityLayer.sendViewMessage(List.of(realViewManager.get()),
+                        new ConfirmViewChangeMessage(clientUID, ViewChangeType.FREEZE_VIEW));
             }
             case NEW_HOST -> {
                 //received by group member from manager when new host try to connect
@@ -291,7 +295,8 @@ public class ViewManager {
                     substituteRealManager = Optional.of(disconnectedClientMessage.newSubstituteViewManagerID);
                 }
                 handleDisconnection(disconnectedClientMessage.disconnectedClientUID);
-                reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()), new ConfirmViewChangeMessage(clientUID, ViewChangeType.DISCONNECTED_CLIENT));
+                reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()),
+                        new ConfirmViewChangeMessage(clientUID, ViewChangeType.DISCONNECTED_CLIENT));
             }
             case RECOVERY_REQUEST -> {
                 //received by group member from manager when a client wants to retrieve missing checkpoints
@@ -437,7 +442,7 @@ public class ViewManager {
     }
 
     public void freezeAndCheckpoint() {
-        if(realViewManager.isEmpty()){
+        if (realViewManager.isEmpty()) {
             startFreezeView();
             handleCheckpoint();
             RestartViewMessage restartViewMessage = new RestartViewMessage();
@@ -478,7 +483,8 @@ public class ViewManager {
      */
     public void start() {
         try {
-            logger.info("Starting host with address " + InetAddress.getLocalHost().getHostAddress() + ", " + "random " + random + " and uuid " + clientUID);
+            logger.info("Starting host with address " + InetAddress.getLocalHost()
+                    .getHostAddress() + ", " + "random " + random + " and uuid " + clientUID);
         } catch (UnknownHostException e) {
             throw new RuntimeException(e);
         }
@@ -509,7 +515,7 @@ public class ViewManager {
     }
 
     private void startFreezeView() {
-        if(realViewManager.isEmpty()){
+        if (realViewManager.isEmpty()) {
             reliabilityLayer.stopMessageSending();
             FreezeViewMessage freezeMessage = new FreezeViewMessage();
             sendBroadcastAndWaitConfirms(freezeMessage);
@@ -544,7 +550,8 @@ public class ViewManager {
             properties.setProperty(P_PROCESS_ID, String.valueOf(processID));
             properties.setProperty(P_RANDOM, String.valueOf(random));
             properties.store(writer, "Info to recover the client in case of disconnection");
-            logger.info("Saved recovery data (ClientUID: " + clientUID + "; ProcessID: " + processID + "; Random: " + random + " into the disk");
+            logger.info(
+                    "Saved recovery data (ClientUID: " + clientUID + "; ProcessID: " + processID + "; Random: " + random + " into the disk");
         } catch (IOException e) {
             logger.fatal("Error writing recovery data to file: " + e.getMessage());
         }
