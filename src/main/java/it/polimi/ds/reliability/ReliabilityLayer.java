@@ -189,6 +189,11 @@ public class ReliabilityLayer {
             }
             try {
                 ReliabilityMessage message = downBuffer.take();
+                synchronized (this) {
+                    while (!messageEnabled) {
+                        wait();
+                    }
+                }
                 if (message.timestamp.processID() == 0) {
                     message = new ReliabilityMessage(message.messageID, message.payload, new ScalarClock(viewManager.getProcessID(), ++eventID));
                 }

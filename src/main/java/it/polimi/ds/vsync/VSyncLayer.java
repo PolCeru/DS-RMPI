@@ -28,7 +28,7 @@ public class VSyncLayer {
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                int random = new Random().nextInt(4);
+                int random = new Random().nextInt(2);
                 if (random == 0) handler.sendMessage(new VSyncMessage("test".getBytes()));
             }
         }, 10000, 4000);
