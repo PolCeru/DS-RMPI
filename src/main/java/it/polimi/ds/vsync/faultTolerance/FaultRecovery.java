@@ -19,8 +19,7 @@ public class FaultRecovery {
 
     private final static Logger logger = LogManager.getLogger();
 
-    //FIXME: init to null only for testing purposes, remove it when done + add final
-    private VSyncLayer vSyncLayer = null;
+    private final VSyncLayer vSyncLayer;
 
     private final SortedSet<VSyncWrapper> log = new TreeSet<>();
 

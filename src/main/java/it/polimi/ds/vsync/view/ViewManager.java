@@ -144,7 +144,7 @@ public class ViewManager {
         switch (baseMessage.messageType) {
             case CONFIRM -> {
                 ConfirmViewChangeMessage message = (ConfirmViewChangeMessage) baseMessage;
-                logger.debug("Received confirm " + message.confirmedAction + " from " + message.senderUid);
+                logger.debug("Received CONFIRM " + message.confirmedAction + " from " + message.senderUid);
                 if (connectedHosts.isEmpty()) {
                     waitingHosts.remove(message.senderUid);
                     substituteRealManager = Optional.of(message.senderUid);
@@ -499,7 +499,7 @@ public class ViewManager {
 
     private void endViewFreeze() {
         reliabilityLayer.startMessageSending();
-        logger.debug("ending freeze view");
+        logger.debug("Freeze view ended");
         logger.trace("Connected clients: " + connectedHosts);
     }
 

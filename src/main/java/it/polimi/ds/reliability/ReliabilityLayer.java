@@ -264,7 +264,8 @@ public class ReliabilityLayer {
         }
         ackMap.sendMessage(messageToSend.messageID, destinations);
         for (UUID destination : destinations) {
-            logger.debug("Sent message " + message.messageType + " " + messageToSend.timestamp + " with ID " + messageToSend.messageID + " to " + destination);
+            logger.debug("Sent message " + message.messageType + " " + messageToSend.timestamp + " with ID " + message.uuid +
+                    " to " + destination);
             handler.sendMessage(destination, messageToSend);
         }
         checkDelivery(messageToSend);
