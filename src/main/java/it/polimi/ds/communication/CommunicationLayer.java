@@ -325,6 +325,7 @@ public class CommunicationLayer {
     public void disconnectClient(UUID clientUID) {
         if(connectedClients.containsKey(clientUID)){
             connectedClients.get(clientUID).close();
+            connectedClients.remove(clientUID);
             viewManager.handleDisconnection(clientUID);
         }
     }
