@@ -16,7 +16,7 @@ public class DiscoveryMessage extends BasicMessage {
         this.random = random;
     }
 
-    protected DiscoveryMessage(LocalDateTime timestamp, UUID senderUID) {
+    public DiscoveryMessage(LocalDateTime timestamp, UUID senderUID) {
         super(timestamp, senderUID, MessageType.DISCOVERY);
         this.random = new Random().nextInt();
     }

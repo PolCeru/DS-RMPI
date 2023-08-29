@@ -305,19 +305,19 @@ public class ViewManager {
                 //received by view manager from reconnecting group member when it wants to retrieve missing checkpoints
                 RecoveryRequestMessage message = (RecoveryRequestMessage) baseMessage;
                 ArrayList<Checkpoint> checkpoints;
-                logger.warn("Received recovery request with id: "+message.lastCheckpointID);
+                logger.warn("Received recovery request with id: " + message.lastCheckpointID);
                 if (message.lastCheckpointID >= 0) {
                     int checkpointID = message.lastCheckpointID;
                     checkpoints = faultRecovery.recoverCheckpoint(checkpointID);
                 } else checkpoints = new ArrayList<>();
-                logger.warn("Checkpoints: "+checkpoints);
+                logger.warn("Checkpoints: " + checkpoints);
                 reliabilityLayer.sendViewMessage(Collections.singletonList(message.senderUUID),
                         new RecoveryPacketMessage(checkpoints));
             }
             case RECOVERY_PACKET -> {
                 //received by group member from manager, it contains the missing checkpoints requested
                 RecoveryPacketMessage message = (RecoveryPacketMessage) baseMessage;
-                logger.warn("Received recovery packet with checkpoints: "+message.checkpoints);
+                logger.warn("Received recovery packet with checkpoints: " + message.checkpoints);
                 faultRecovery.addMissingCheckpoints(message.checkpoints);
                 reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()),
                         new ConfirmViewChangeMessage(clientUID, ViewChangeType.RECOVERY_PACKET));
@@ -394,7 +394,7 @@ public class ViewManager {
             } else
                 initialTopologyMessage = new InitialTopologyMessage(clientUID, ++clientsProcessIDCounter,
                         getCompleteTopology(), substituteRealManager.orElse(null),
-                        faultRecovery.getCheckpointCounter()-1);
+                        faultRecovery.getCheckpointCounter() - 1);
             reliabilityLayer.sendViewMessage(Collections.singletonList(newHostId), initialTopologyMessage);
             acknowledgeMap.sendMessage(initialTopologyMessage.uuid, Collections.singletonList(newHostId));
             //sent new host message to all other hosts
@@ -479,10 +479,16 @@ public class ViewManager {
             disconnectedHosts.add(clientUID);
             reliabilityLayer.handleDisconnection(clientUID);
         }
-        if (clientUID.equals(realViewManager.orElse(null)) && substituteRealManager.isEmpty()) {
-            realViewManager = Optional.empty();
-            substituteRealManager = connectedHosts.stream().findFirst();
-            changeManager = true;
+        if (clientUID.equals(realViewManager.orElse(null))) {
+            if (substituteRealManager.isEmpty()) {
+                realViewManager = Optional.empty();
+                substituteRealManager = connectedHosts.stream().findFirst();
+                changeManager = true;
+            } else {
+                realViewManager = substituteRealManager;
+                substituteRealManager = Optional.empty();
+                changeManager = true;
+            }
         }
         if (realViewManager.isEmpty()) {
             if (connectedHosts.size() > 0) {
