@@ -15,7 +15,12 @@ public class Middleware implements MiddlewareAPI {
     }
 
     @Override
-    public byte[] retrieveStableMessage() {
+    public byte[] readMessage() {
         return vSyncLayer.receiveMessage();
+    }
+
+    @Override
+    public byte[] nextStableMessage() {
+        return vSyncLayer.retrieveStableMessage();
     }
 }

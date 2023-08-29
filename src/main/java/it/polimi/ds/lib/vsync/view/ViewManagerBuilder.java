@@ -33,4 +33,8 @@ public class ViewManagerBuilder {
         if (instance == null) instance = new ViewManager(vSyncLayer, reliabilityLayer, communicationLayer, faultRecovery);
         return instance;
     }
+
+    public VSyncLayer getVSyncLayer() {
+        return vSyncLayer;
+    }
 }

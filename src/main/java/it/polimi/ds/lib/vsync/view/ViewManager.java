@@ -2,6 +2,7 @@ package it.polimi.ds.lib.vsync.view;
 
 import it.polimi.ds.lib.communication.CommunicationLayer;
 import it.polimi.ds.lib.communication.message.DiscoveryMessage;
+import it.polimi.ds.lib.vsync.VSyncMessage;
 import it.polimi.ds.lib.vsync.view.message.*;
 import it.polimi.ds.lib.reliability.AcknowledgeMap;
 import it.polimi.ds.lib.reliability.ReliabilityLayer;
@@ -23,6 +24,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 //@SuppressWarnings("OptionalGetWithoutIsPresent")
 public class ViewManager {
+
+    final VSyncLayer vsyncLayer;
 
     /**
      * Random number used by the protocol to decide which device is the master and should start the connection
@@ -137,6 +140,7 @@ public class ViewManager {
                 }
             }
         }.start();
+        vsyncLayer = vSyncLayer;
     }
 
     public void handleViewMessage(ViewManagerMessage baseMessage) {
@@ -239,9 +243,7 @@ public class ViewManager {
                     faultRecovery.getProperties().load(reader);
                     int checkpointCounter = Integer.parseInt(
                             faultRecovery.getProperties().getProperty("CheckpointCounter"));
-                    logger.warn("Checkpoint counter after parsing: " + checkpointCounter);
                     checkpointCounter = checkpointCounter >= 0 ? checkpointCounter : -1;
-                    logger.warn("Checkpoint counter after condition evaluation: " + checkpointCounter);
                     if (isRecoverable)
                         reliabilityLayer.sendViewMessage(List.of(realViewManager.get()),
                                 new RecoveryRequestMessage(checkpointCounter, clientUID));
@@ -305,20 +307,19 @@ public class ViewManager {
                 //received by view manager from reconnecting group member when it wants to retrieve missing checkpoints
                 RecoveryRequestMessage message = (RecoveryRequestMessage) baseMessage;
                 ArrayList<Checkpoint> checkpoints;
-                logger.warn("Received recovery request with id: " + message.lastCheckpointID);
                 if (message.lastCheckpointID >= 0) {
                     int checkpointID = message.lastCheckpointID;
                     checkpoints = faultRecovery.recoverCheckpoint(checkpointID);
                 } else checkpoints = new ArrayList<>();
-                logger.warn("Checkpoints: " + checkpoints);
                 reliabilityLayer.sendViewMessage(Collections.singletonList(message.senderUUID),
                         new RecoveryPacketMessage(checkpoints));
             }
             case RECOVERY_PACKET -> {
                 //received by group member from manager, it contains the missing checkpoints requested
                 RecoveryPacketMessage message = (RecoveryPacketMessage) baseMessage;
-                logger.warn("Received recovery packet with checkpoints: " + message.checkpoints);
                 faultRecovery.addMissingCheckpoints(message.checkpoints);
+                List<FaultRecovery.VSyncWrapper> messages = faultRecovery.deserializeChecPoints(message.checkpoints);
+                vsyncLayer.addAllMessage(messages);
                 reliabilityLayer.sendViewMessage(Collections.singletonList(realViewManager.get()),
                         new ConfirmViewChangeMessage(clientUID, ViewChangeType.RECOVERY_PACKET));
             }

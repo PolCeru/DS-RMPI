@@ -10,8 +10,10 @@ public class Main {
         Middleware middleware = new Middleware();
         middleware.start();
         new Thread(() -> {
-            byte[] payload = middleware.retrieveStableMessage();
-            System.out.println("Received stable message: " + new String(payload));
+            while (true) {
+                byte[] payload = middleware.readMessage();
+                System.out.println("Received stable message: " + new String(payload));
+            }
         }).start();
         System.out.println("When you want to send a message, digit the text and press enter.\nDigit \"exit\" to exit.");
         Scanner scanner = new Scanner(System.in);

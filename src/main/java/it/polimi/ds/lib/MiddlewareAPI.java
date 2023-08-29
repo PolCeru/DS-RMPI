@@ -5,5 +5,7 @@ public interface MiddlewareAPI {
 
     public void sendMessage(byte[] payload);
 
-    public byte[] retrieveStableMessage();
+    public byte[] readMessage();
+
+    public byte[] nextStableMessage();
 }

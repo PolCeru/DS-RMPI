@@ -1,6 +1,8 @@
 package it.polimi.ds.lib.vsync.faultTolerance;
 
 import com.google.gson.Gson;
+import it.polimi.ds.lib.reliability.ReliabilityLayer;
+import it.polimi.ds.lib.reliability.ReliabilityMessage;
 import it.polimi.ds.lib.reliability.ScalarClock;
 import it.polimi.ds.lib.vsync.VSyncLayer;
 import it.polimi.ds.lib.vsync.VSyncMessage;
@@ -82,7 +84,7 @@ public class FaultRecovery {
      * checkpoints incrementing the counter
      */
     public void doCheckpoint(){
-        List<byte[]> byteList = log.stream().map(vSyncWrapper -> gson.toJson(vSyncWrapper.message).getBytes()).toList();
+        List<byte[]> byteList = log.stream().map(vSyncWrapper -> gson.toJson(vSyncWrapper).getBytes()).toList();
         Checkpoint checkpoint = new Checkpoint(checkpointCounter, byteList);
         if (!byteList.isEmpty()){
             writeCheckpointOnFile(byteList);
@@ -246,7 +248,15 @@ public class FaultRecovery {
         return checkpointCounter;
     }
 
-    private record VSyncWrapper(VSyncMessage message, ScalarClock timestamp) implements Comparable<VSyncWrapper> {
+    public List<VSyncWrapper> deserializeChecPoints(ArrayList<Checkpoint> checkpoints) {
+        List<VSyncWrapper> reliabilityMessages = new ArrayList<>();
+        for (Checkpoint checkpoint : checkpoints) {
+            checkpoint.getMessages().stream().map(msg -> gson.fromJson(Arrays.toString(msg), VSyncWrapper.class)).forEach(reliabilityMessages::add);
+        }
+        return reliabilityMessages;
+    }
+
+    public record VSyncWrapper(VSyncMessage message, ScalarClock timestamp) implements Comparable<VSyncWrapper> {
         @Override
         public int compareTo(VSyncWrapper o) {
             return timestamp.compareTo(o.timestamp);

@@ -4,6 +4,7 @@ import it.polimi.ds.lib.communication.CommunicationLayer;
 import it.polimi.ds.lib.communication.message.DataMessage;
 import it.polimi.ds.lib.utils.StablePriorityBlockingQueue;
 import it.polimi.ds.lib.vsync.KnowledgeableMessageType;
+import it.polimi.ds.lib.vsync.VSyncLayer;
 import it.polimi.ds.lib.vsync.view.ViewManager;
 import it.polimi.ds.lib.vsync.view.ViewManagerBuilder;
 import it.polimi.ds.lib.vsync.VSyncMessage;
@@ -17,6 +18,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class ReliabilityLayer {
+
+    private final VSyncLayer vSyncLayer;
 
     private final static Logger logger = LogManager.getLogger();
 
@@ -69,6 +72,7 @@ public class ReliabilityLayer {
 
     public ReliabilityLayer(ViewManagerBuilder managerBuilder, FaultRecovery faultRecovery) {
         this.faultRecovery = faultRecovery;
+        this.vSyncLayer = managerBuilder.getVSyncLayer();
         managerBuilder.setReliabilityLayer(this);
         this.handler = CommunicationLayer.defaultConfiguration(managerBuilder);
         viewManager = managerBuilder.create();
@@ -87,7 +91,7 @@ public class ReliabilityLayer {
             UUID senderUID = dataMessage.senderUID;
             ReliabilityMessage messageReceived = dataMessage.payload;
             if (messageReceived.messageType == MessageType.ACK)
-                logger.debug("Received " + messageReceived.messageType + " message with ID " +
+                logger.trace("Received " + messageReceived.messageType + " message with ID " +
                         messageReceived.messageID + " for message " + messageReceived.referenceMessageID + " from " + senderUID);
             else
                 logger.trace("Received " + messageReceived.messageType + " message with ID " +
@@ -148,12 +152,14 @@ public class ReliabilityLayer {
                     }
                 }
             }
+            if(message!= null)
+                vSyncLayer.addMessage(message);
             if (toLog) {
                 faultRecovery.logMessage((VSyncMessage) message.getPayload(), message.timestamp);
                 logger.info("Logged message: " + message.messageID + " " + message.timestamp);
             }
         } else
-            logger.warn("Message " + referencedMessageID + " is not stable yet, missing "+ ackMap.missingAcks(referencedMessageID));
+            logger.debug("Message " + referencedMessageID + " is not stable yet, missing "+ ackMap.missingAcks(referencedMessageID));
     }
 
     private void sendAck(ReliabilityMessage messageReceived, ScalarClock timestamp, UUID senderUID) {
@@ -199,7 +205,7 @@ public class ReliabilityLayer {
                     message = new ReliabilityMessage(message.messageID, message.payload,
                             new ScalarClock(viewManager.getProcessID(), ++eventID));
                 }
-                logger.debug(
+                logger.trace(
                         "Sending " + message.messageType + " message with ID " + message.messageID + " " + message.timestamp + " to" +
                                 " all clients");
                 handler.sendMessageBroadcast(message);
@@ -240,6 +246,7 @@ public class ReliabilityLayer {
                     }
                     ackMap.remove(messageToCheck.messageID);
                     timer.cancel();
+                    unstableSentMessagesTimer.remove(messageToCheck.messageID);
                 } else {
                     list.forEach(id -> {
                         if (!retries.containsKey(messageToCheck)) {
